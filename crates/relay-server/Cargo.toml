@@ -5,3 +5,8 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+s2n-quic.workspace = true
+tokio.workspace = true
