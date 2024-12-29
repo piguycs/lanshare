@@ -1,3 +1,5 @@
+set dotenv-load := true
+
 @run-client:
     cargo run -p ls-client
 
@@ -6,3 +8,7 @@
 
 @run-server:
     cargo run -p relay-server
+
+@echo-env:
+    echo $CERT_PATH
+    echo $KEY_PATH
