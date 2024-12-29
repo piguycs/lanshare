@@ -1,0 +1,10 @@
+[package]
+name = "ls-client"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+quiche = "0.22.0"
+tracing.workspace = true
+tracing-subscriber.workspace = true

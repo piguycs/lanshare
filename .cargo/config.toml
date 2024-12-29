@@ -1,0 +1,2 @@
+[env]
+RUST_LOG = "ls_daemon=trace,ls_client=trace,info"
