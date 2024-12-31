@@ -4,7 +4,7 @@
 #[macro_use]
 extern crate tracing;
 
-use s2n_quic::Server;
+use s2n_quic::{stream::BidirectionalStream, Connection, Server};
 
 type BoxError = Box<dyn std::error::Error>;
 
@@ -23,11 +23,30 @@ async fn main() -> Result<(), BoxError> {
         .start()?;
 
     trace!("accepting connections");
-    while let Some(mut _connection) = server.accept().await {
-        info!("hello world");
-        tokio::spawn(async {});
-        //
+    while let Some(connection) = server.accept().await {
+        tokio::spawn(handle_connection(connection));
     }
 
     Ok(())
+}
+
+async fn handle_connection(mut connection: Connection) {
+    info!("Connection accepted from {:?}", connection.remote_addr());
+
+    while let Ok(Some(stream)) = connection.accept_bidirectional_stream().await {
+        tokio::spawn(handle_stream(stream));
+    }
+}
+
+async fn handle_stream(mut stream: BidirectionalStream) {
+    info!("Stream opened from {:?}", stream.connection().remote_addr());
+
+    while let Ok(Some(data)) = stream.receive().await {
+        debug!("stream sent {:?}", String::from_utf8(data.to_vec()));
+
+        stream
+            .send("ACK".into())
+            .await
+            .expect("stream should be open");
+    }
 }
