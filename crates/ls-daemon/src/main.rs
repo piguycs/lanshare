@@ -2,6 +2,7 @@
 //! Creating this allows us to run our client in userspace, as TUN/TAP devices need to be managed
 //! by a superuser. This daemon does that job as a systemd service, using unix sockets for IPC
 
+use coreipc::IpcServer;
 use etherparse::Ipv4Slice;
 
 use std::io::Read;
@@ -38,9 +39,17 @@ impl App {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     tracing_subscriber::fmt::init();
 
+    let ipc_server = IpcServer::create_server("lanshare.sock").unwrap();
+
+    ipc_server.broadcast().await;
+}
+
+#[allow(unused)]
+fn a() {
     let app = App::new();
 
     // TUN-Device from the tun crate

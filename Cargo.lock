@@ -248,6 +248,9 @@ dependencies = [
 [[package]]
 name = "coreipc"
 version = "0.1.0"
+dependencies = [
+ "tokio",
+]
 
 [[package]]
 name = "crossbeam-utils"
@@ -612,7 +615,9 @@ dependencies = [
 name = "ls-daemon"
 version = "0.1.0"
 dependencies = [
+ "coreipc",
  "etherparse",
+ "tokio",
  "tracing",
  "tracing-subscriber",
  "tun",
