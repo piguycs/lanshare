@@ -3,6 +3,9 @@
 //! # TODO LIST
 //! Make a REPL where I can send events to the client
 
+#[macro_use]
+extern crate tracing;
+
 use tokio::io::AsyncWriteExt;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::Mutex;
@@ -12,7 +15,7 @@ use std::sync::Arc;
 use std::{fs, io};
 
 pub struct IpcServer {
-    name: &'static str,
+    name: String,
     socket: UnixListener,
     clients: Arc<Mutex<Vec<UnixStream>>>,
 }
@@ -23,33 +26,38 @@ impl IpcServer {
     /// # Description
     /// The server acts as the initiator of the connection and maintains ownership of the socket.
     /// Since the data stream is bi-directional, both the server and client can send and receive data.
-    pub fn create_server(name: &'static str) -> io::Result<Self> {
+    pub fn create_server(name: &str) -> io::Result<Self> {
         Self::create_runtime_dir()?;
 
         let socket = UnixListener::bind(f!("/run/coreipc/{name}"))?;
 
         Ok(Self {
             socket,
-            name,
+            name: name.to_string(),
             clients: Arc::default(),
         })
     }
 
     // send to all clients
     pub async fn broadcast(&self, pkt: &[u8]) {
-        let mut clients = self.clients.lock().await;
+        info!("broadcast received with {} bytes", pkt.len(),);
 
+        let mut clients = self.clients.lock().await;
         for stream in &mut *clients {
             if let Err(error) = stream.write_all(pkt).await {
                 eprintln!("could not write to stream: {error}");
             }
         }
+        drop(clients);
     }
 
     pub async fn run(&self) {
         loop {
+            info!("waiting for client");
             if let Ok((stream, _addr)) = self.socket.accept().await {
+                info!("attempting to lock clients");
                 let mut clients = self.clients.lock().await;
+                info!("added client");
                 clients.push(stream);
                 drop(clients); // this is implied, but we do it anyways
             }
@@ -63,7 +71,7 @@ impl IpcServer {
 
     /// deleting the socket once the struct is dropped
     fn destroy_server(&self) -> io::Result<()> {
-        let name = self.name;
+        let name = &self.name;
 
         fs::remove_file(f!("/run/coreipc/{name}"))?;
         Ok(())

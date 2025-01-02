@@ -244,6 +244,8 @@ name = "coreipc"
 version = "0.1.0"
 dependencies = [
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
