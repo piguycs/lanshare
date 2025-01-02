@@ -10,7 +10,7 @@ tracing-subscriber.workspace = true
 
 tokio.workspace = true
 
-etherparse = "0.16.0"
-tun = "0.7.10"
+# etherparse = "0.16.0" # I needed this for debugging
+tun = "0.7.10" # TODO: switch to tokio-tun for linux
 
 coreipc.workspace = true

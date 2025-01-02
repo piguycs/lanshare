@@ -4,14 +4,17 @@
 //! Make a REPL where I can send events to the client
 
 use tokio::io::AsyncWriteExt;
-use tokio::net::UnixListener;
+use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::Mutex;
 
 use std::format as f;
+use std::sync::Arc;
 use std::{fs, io};
 
 pub struct IpcServer {
-    socket: UnixListener,
     name: &'static str,
+    socket: UnixListener,
+    clients: Arc<Mutex<Vec<UnixStream>>>,
 }
 
 impl IpcServer {
@@ -25,19 +28,30 @@ impl IpcServer {
 
         let socket = UnixListener::bind(f!("/run/coreipc/{name}"))?;
 
-        Ok(Self { socket, name })
+        Ok(Self {
+            socket,
+            name,
+            clients: Arc::default(),
+        })
     }
 
     // send to all clients
-    pub async fn broadcast(&self) {
+    pub async fn broadcast(&self, pkt: &[u8]) {
+        let mut clients = self.clients.lock().await;
+
+        for stream in &mut *clients {
+            if let Err(error) = stream.write_all(pkt).await {
+                eprintln!("could not write to stream: {error}");
+            }
+        }
+    }
+
+    pub async fn run(&self) {
         loop {
-            if let Ok((mut stream, addr)) = self.socket.accept().await {
-                println!("hello from {addr:?}");
-                tokio::spawn(async move {
-                    if let Err(error) = stream.write_all(b"hello world\n").await {
-                        eprintln!("could not write to stream: {error}");
-                    }
-                });
+            if let Ok((stream, _addr)) = self.socket.accept().await {
+                let mut clients = self.clients.lock().await;
+                clients.push(stream);
+                drop(clients); // this is implied, but we do it anyways
             }
         }
     }
