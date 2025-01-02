@@ -2,7 +2,7 @@
 //! Creating this allows us to run our client in userspace, as TUN/TAP devices need to be managed
 //! by a superuser. This daemon does that job as a systemd service, using unix sockets for IPC
 
-use etherparse::Ipv4HeaderSlice;
+use etherparse::Ipv4Slice;
 
 use std::io::Read;
 
@@ -41,8 +41,6 @@ impl App {
 fn main() {
     tracing_subscriber::fmt::init();
 
-    trace!("hello world");
-
     let app = App::new();
 
     // TUN-Device from the tun crate
@@ -54,7 +52,7 @@ fn main() {
         let pkt_size = dev.read(&mut buf).expect("could not read into buffer");
         let pkt = &buf[..pkt_size];
 
-        let header = match Ipv4HeaderSlice::from_slice(pkt) {
+        let header = match Ipv4Slice::from_slice(pkt) {
             Ok(value) => value,
             Err(error) => {
                 debug!("could not parse packet header: {error}");
@@ -62,6 +60,6 @@ fn main() {
             }
         };
 
-        info!("{:?}", header.protocol());
+        info!("{:?}", header);
     }
 }

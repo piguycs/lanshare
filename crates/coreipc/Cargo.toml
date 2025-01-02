@@ -1,5 +1,5 @@
 [package]
-name = "protoipc"
+name = "coreipc"
 version = "0.1.0"
 edition.workspace = true
 authors.workspace = true
