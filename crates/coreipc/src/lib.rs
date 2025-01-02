@@ -8,16 +8,16 @@ extern crate tracing;
 
 use tokio::io::AsyncWriteExt;
 use tokio::net::{UnixListener, UnixStream};
-use tokio::sync::Mutex;
 
 use std::format as f;
-use std::sync::Arc;
+use std::os::unix::fs::PermissionsExt;
+use std::os::unix::net::UnixListener as StdListener;
 use std::{fs, io};
 
 pub struct IpcServer {
     name: String,
     socket: UnixListener,
-    clients: Arc<Mutex<Vec<UnixStream>>>,
+    client: Option<UnixStream>,
 }
 
 impl IpcServer {
@@ -29,38 +29,48 @@ impl IpcServer {
     pub fn create_server(name: &str) -> io::Result<Self> {
         Self::create_runtime_dir()?;
 
-        let socket = UnixListener::bind(f!("/run/coreipc/{name}"))?;
+        let socket_path = format!("/run/coreipc/{}", name);
+
+        let listener = StdListener::bind(&socket_path)?;
+        listener.set_nonblocking(true)?;
+
+        let socket = UnixListener::from_std(listener)?;
+
+        // Change the permissions to make it accessible by all users
+        let permissions = fs::Permissions::from_mode(0o777);
+        fs::set_permissions(&socket_path, permissions)?;
 
         Ok(Self {
             socket,
             name: name.to_string(),
-            clients: Arc::default(),
+            client: None,
         })
     }
 
-    // send to all clients
-    pub async fn broadcast(&self, pkt: &[u8]) {
-        info!("broadcast received with {} bytes", pkt.len(),);
+    pub async fn broadcast(&mut self, pkt: &[u8]) {
+        let len = pkt.len() as u16;
+        info!("broadcast received with {} bytes", len);
 
-        let mut clients = self.clients.lock().await;
-        for stream in &mut *clients {
-            if let Err(error) = stream.write_all(pkt).await {
-                eprintln!("could not write to stream: {error}");
+        let res = match &mut self.client {
+            Some(stream) => {
+                if let Err(error) = stream.write_u16(len).await {
+                    Err(error)
+                } else {
+                    stream.write_all(pkt).await
+                }
             }
+            None => todo!("encode state in the type"),
+        };
+
+        if let Err(error) = res {
+            error!("could not write to stream {error}");
         }
-        drop(clients);
     }
 
-    pub async fn run(&self) {
-        loop {
-            info!("waiting for client");
-            if let Ok((stream, _addr)) = self.socket.accept().await {
-                info!("attempting to lock clients");
-                let mut clients = self.clients.lock().await;
-                info!("added client");
-                clients.push(stream);
-                drop(clients); // this is implied, but we do it anyways
-            }
+    pub async fn wait_for_client(&mut self) {
+        if let Ok((stream, _addr)) = self.socket.accept().await {
+            info!("added client");
+            self.client = Some(stream);
         }
     }
 

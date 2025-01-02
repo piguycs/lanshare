@@ -8,6 +8,8 @@ authors.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
+etherparse = "0.16.0"
+
 s2n-quic.workspace = true
 
 tokio.workspace = true

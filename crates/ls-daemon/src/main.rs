@@ -5,18 +5,19 @@
 use std::io::Read;
 
 use ls_daemon::App;
-use tokio::join;
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let app = App::try_new().expect("could not create ipc server");
+    let mut app = App::try_new().expect("could not create ipc server");
 
-    let _handle = join!(app.ipc.run(), eloop(&app));
+    app.ipc.wait_for_client().await;
+
+    eloop(&mut app).await;
 }
 
-async fn eloop(app: &App) {
+async fn eloop(app: &mut App) {
     // TUN-Device from the tun crate
     let mut dev = app.create_dev().expect("device could not be created");
 
