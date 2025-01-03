@@ -5,6 +5,7 @@
 use std::io::Read;
 
 use ls_daemon::App;
+use tokio::net::UnixListener;
 
 #[tokio::main]
 async fn main() {
@@ -16,10 +17,23 @@ async fn main() {
 
     let mut buf = [0; 4096];
 
-    loop {
-        let pkt_size = dev.read(&mut buf).expect("could not read into buffer");
-        let pkt = &buf[..pkt_size];
+    let socket = UnixListener::bind("lanshare.sock").unwrap();
 
-        tracing::info!("{pkt:?}");
-    }
+    let ipc = coreipc::server::Ipc::from_socket(socket).unwrap();
+
+    let ipc_task = tokio::spawn(async move {
+        ipc.run().await;
+    });
+
+    tokio::select! {
+        _ = ipc_task => {},
+        _ = async {
+                loop {
+                    let pkt_size = dev.read(&mut buf).expect("could not read into buffer");
+                    let pkt = &buf[..pkt_size];
+
+                    tracing::info!("{pkt:?}");
+                }
+            } => {}
+    };
 }

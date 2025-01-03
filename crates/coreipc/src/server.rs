@@ -1,8 +1,9 @@
+//! CoreIPC Server - The owner of the data stream
+
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::RwLock;
 
 use std::collections::HashMap;
-use std::marker::PhantomData;
 use std::sync::Arc;
 use std::{env, io, path::PathBuf};
 
@@ -10,17 +11,29 @@ use crate::socket::IntoSocket;
 
 pub const COREIPC_RUNTIME_DIR: &str = "COREIPC_RUNTIME_DIR";
 
-type ClientsArc = Arc<RwLock<HashMap<u32, UnixStream>>>;
+type ClientsArc = Arc<RwLock<HashMap<u16, UnixStream>>>;
 
 #[derive(Debug)]
-pub struct Ipc<T> {
+pub struct Ipc {
     socket: UnixListener,
     clients: ClientsArc,
-
-    data_type: PhantomData<T>,
 }
 
-impl<T> Ipc<T> {
+impl Ipc {
+    /// Creates a new server that initiates and manages a data stream
+    ///
+    /// # Description
+    /// The server acts as the initiator of the connection and maintains ownership of the socket.
+    /// Since the data stream is bi-directional, both the server and client can send and receive data.
+    ///
+    /// Creates a socket in `/run/coreipc/{name}` or in `$COREIPC_RUNTIME_DIR/{name}` if the
+    /// enviorenment variable is set
+    ///
+    /// # Example
+    /// ```rust
+    /// let server = Ipc::create_server()?;
+    /// let _ = server.run().await;
+    /// ```
     #[instrument]
     pub fn create_server(name: &str) -> io::Result<Self> {
         let socket_path = Self::get_socket_path(name);
@@ -31,11 +44,25 @@ impl<T> Ipc<T> {
         Ok(Self {
             socket,
             clients: Arc::default(),
-
-            data_type: PhantomData,
         })
     }
 
+    /// Creates a new server that initiates and manages a data stream. Uses an existing
+    /// UnixListener from either the standard library or tokio::net instead of creating a new one
+    ///
+    /// this is infailable when using [tokio::net::UnixListener] because no type conversion is
+    /// necessary. It can fail when using a [std::os::unix::net::UnixListener].
+    ///
+    /// # Description
+    /// The server acts as the initiator of the connection and maintains ownership of the socket.
+    /// Since the data stream is bi-directional, both the server and client can send and receive data.
+    ///
+    /// # Example
+    /// ```rust
+    /// let socket = tokio::net::UnixListener::bind("ipc.sock");
+    /// let server = Ipc::from_socketr().unwrap();
+    /// let _ = server.run().await;
+    /// ```
     #[instrument(skip(socket))]
     pub fn from_socket<S: IntoSocket>(socket: S) -> io::Result<Self> {
         let socket = socket.into_socket()?;
@@ -43,28 +70,31 @@ impl<T> Ipc<T> {
         Ok(Self {
             socket,
             clients: Arc::default(),
-
-            data_type: PhantomData,
         })
     }
 
+    #[instrument(skip(self))]
     pub async fn run(&self) {
         let clients = Arc::clone(&self.clients);
 
         match self.socket.accept().await {
             Ok((stream, _addr)) => {
                 let client_id = rand::random();
-                let mut clients = clients.write().await;
-                clients.insert(client_id, stream);
+                let mut clients_w = clients.write().await;
+                clients_w.insert(client_id, stream);
+
+                let clients = Arc::clone(&clients);
+
+                tokio::spawn(Self::handle_client(client_id, clients));
             }
-            Err(_) => todo!(),
+            Err(error) => error!("could not accept connection: {error}"),
         }
     }
 
+    #[instrument]
     async fn handle_client(client_id: u16, clients: ClientsArc) {
-        //
-        //
-        //
+        debug!(?client_id, ?clients);
+        todo!();
     }
 
     #[instrument]
@@ -89,14 +119,14 @@ mod unit_test {
         let sock_dir = "/tmp";
 
         temp_env::with_var(COREIPC_RUNTIME_DIR, Some(sock_dir), || {
-            let socket_path = Ipc::<()>::get_socket_path(name);
+            let socket_path = Ipc::get_socket_path(name);
             assert_eq!(socket_path.as_os_str(), "/tmp/test.sock");
         });
     }
 
     #[test]
     fn socket_path() {
-        let socket_path = Ipc::<()>::get_socket_path("test.sock");
+        let socket_path = Ipc::get_socket_path("test.sock");
         assert_eq!(socket_path.as_os_str(), "/run/coreipc/test.sock");
     }
 
@@ -105,7 +135,7 @@ mod unit_test {
         // this ensures cleanup of the socket after test
         // you can verify this with `ls /tmp/.tmp*` before and after
         let socket = tempfile::Builder::new().make(|e| UnixListener::bind(e))?;
-        Ipc::<()>::from_socket(socket.into_file())?;
+        Ipc::from_socket(socket.into_file())?;
 
         Ok(())
     }
@@ -115,7 +145,7 @@ mod unit_test {
         use std::os::unix::net::UnixListener;
 
         let socket = tempfile::Builder::new().make(|e| UnixListener::bind(e))?;
-        Ipc::<()>::from_socket(socket.into_file())?;
+        Ipc::from_socket(socket.into_file())?;
 
         Ok(())
     }
