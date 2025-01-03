@@ -12,3 +12,6 @@ set dotenv-load := true
 @echo-env:
     echo $CERT_PATH
     echo $KEY_PATH
+
+@test:
+    cargo nextest run

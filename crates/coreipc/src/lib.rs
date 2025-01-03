@@ -6,7 +6,8 @@
 //!   - The client can only connect once and cannot reconnect
 //!   - The dev device is not allowed to capture packets without a client
 
-mod server;
+pub mod server;
+pub(crate) mod socket;
 
 #[macro_use]
 extern crate tracing;

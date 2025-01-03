@@ -10,3 +10,9 @@ But this also means that there is a 1/3 chance that the user's private network
 is using this range, and there could be clashes.
 
 [^1]: [List of reserved /8 ranges](https://en.wikipedia.org/wiki/List_of_assigned_/8_IPv4_address_blocks#List_of_assigned_/8_blocks_to_the_regional_Internet_registries)
+
+# naming convention
+
+I am known to be more of a "write first, test later" kinda guy, but I want to
+change it. I am also going to name modules containing unit tests as "unit_test"
+and integration tests would be in their own folder.
