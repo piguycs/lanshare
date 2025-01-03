@@ -3,19 +3,21 @@
 //! # TODO LIST
 //! Make a REPL where I can send events to the client
 
+mod server;
+
 #[macro_use]
 extern crate tracing;
 
 use tokio::io::AsyncWriteExt;
 use tokio::net::{UnixListener, UnixStream};
 
-use std::format as f;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixListener as StdListener;
-use std::{fs, io};
+use std::path::{Path, PathBuf};
+use std::{env, fs, io};
 
 pub struct IpcServer {
-    name: String,
+    socket_path: PathBuf,
     socket: UnixListener,
     client: Option<UnixStream>,
 }
@@ -27,9 +29,15 @@ impl IpcServer {
     /// The server acts as the initiator of the connection and maintains ownership of the socket.
     /// Since the data stream is bi-directional, both the server and client can send and receive data.
     pub fn create_server(name: &str) -> io::Result<Self> {
-        Self::create_runtime_dir()?;
+        let base_path = env::var("COREIPC_BASE_PATH").unwrap_or("/run/coreipc".to_string());
+        let base_path = PathBuf::from(base_path);
 
-        let socket_path = format!("/run/coreipc/{}", name);
+        Self::create_runtime_dir(&base_path)?;
+
+        let socket_path = base_path.join(name);
+
+        dbg!("socket");
+        dbg!(&socket_path);
 
         let listener = StdListener::bind(&socket_path)?;
         listener.set_nonblocking(true)?;
@@ -42,7 +50,7 @@ impl IpcServer {
 
         Ok(Self {
             socket,
-            name: name.to_string(),
+            socket_path,
             client: None,
         })
     }
@@ -74,16 +82,17 @@ impl IpcServer {
         }
     }
 
-    fn create_runtime_dir() -> io::Result<()> {
-        fs::create_dir_all("/run/coreipc")?;
+    fn create_runtime_dir<P: AsRef<Path>>(base_path: P) -> io::Result<()> {
+        if !base_path.as_ref().exists() {
+            fs::create_dir_all(base_path)?;
+        }
+
         Ok(())
     }
 
     /// deleting the socket once the struct is dropped
     fn destroy_server(&self) -> io::Result<()> {
-        let name = &self.name;
-
-        fs::remove_file(f!("/run/coreipc/{name}"))?;
+        fs::remove_file(&self.socket_path)?;
         Ok(())
     }
 }
@@ -100,10 +109,15 @@ impl Drop for IpcServer {
 mod test {
     use super::*;
 
-    #[test]
-    fn create_new_server() {
+    #[tokio::test]
+    async fn create_new_server() {
+        let base_dir = format!("{}/target/test", env!("CARGO_MANIFEST_DIR"));
+        unsafe {
+            env::set_var("COREIPC_BASE_PATH", &base_dir);
+        }
+
         let server_name = "hello_world";
-        let path = format!("/run/coreipc/{}", server_name);
+        let path = format!("{base_dir}/{server_name}");
 
         {
             let _server = IpcServer::create_server(server_name).unwrap();
