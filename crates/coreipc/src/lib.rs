@@ -1,7 +1,10 @@
 //! CoreIPC - Event driven IPC library for LANShare
 //!
 //! # TODO LIST
-//! Make a REPL where I can send events to the client
+//! - Make more maintainable and robust backend. I need to improve upon these points:
+//!   - Right now, only one client is supported
+//!   - The client can only connect once and cannot reconnect
+//!   - The dev device is not allowed to capture packets without a client
 
 mod server;
 
