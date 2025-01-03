@@ -8,6 +8,4 @@ is to have a proper API to communicate with the daemon. Right now I do it in a
 very hacky manner
 
 Well, I will take a small break from this, I need to finish my Advent of Code
-for last year, as I have not yet done it all. ESPECIALLY day 21. Maybe I will
-feel less like a failure if I end up completing all 50 stars, even if they are
-a little late...
+for last year, as I have not yet done it all.
