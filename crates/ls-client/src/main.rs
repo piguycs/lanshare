@@ -1,5 +1,7 @@
 //! LANShare Client application
 
+use tokio::{io::AsyncWriteExt, net::UnixStream};
+
 #[macro_use]
 extern crate tracing;
 
@@ -10,6 +12,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
     info!("starting client");
+
+    let mut sock = UnixStream::connect("lanshare.sock").await?;
+
+    sock.write_all(b"hello world").await?;
 
     Ok(())
 }

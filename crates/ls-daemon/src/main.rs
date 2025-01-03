@@ -26,7 +26,7 @@ async fn main() {
     });
 
     tokio::select! {
-        _ = ipc_task => {},
+        e = ipc_task => {e.unwrap()},
         _ = async {
                 loop {
                     let pkt_size = dev.read(&mut buf).expect("could not read into buffer");

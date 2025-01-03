@@ -36,6 +36,7 @@ impl Ipc {
     /// ```
     #[instrument]
     pub fn create_server(name: &str) -> io::Result<Self> {
+        info!("creating server using name");
         let socket_path = Self::get_socket_path(name);
 
         let socket = UnixListener::bind(&socket_path)?;
@@ -63,9 +64,11 @@ impl Ipc {
     /// let server = Ipc::from_socketr().unwrap();
     /// let _ = server.run().await;
     /// ```
-    #[instrument(skip(socket))]
-    pub fn from_socket<S: IntoSocket>(socket: S) -> io::Result<Self> {
-        let socket = socket.into_socket()?;
+    #[instrument(skip(unix_socket))]
+    pub fn from_socket<S: IntoSocket>(unix_socket: S) -> io::Result<Self> {
+        info!("creating server using socket");
+        let socket = unix_socket.into_socket()?;
+        debug!(?socket);
 
         Ok(Self {
             socket,
