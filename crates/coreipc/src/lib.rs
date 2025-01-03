@@ -6,6 +6,7 @@
 //!   - The client can only connect once and cannot reconnect
 //!   - The dev device is not allowed to capture packets without a client
 
+pub mod client;
 pub mod server;
 pub(crate) mod socket;
 
