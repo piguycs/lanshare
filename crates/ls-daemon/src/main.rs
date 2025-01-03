@@ -10,15 +10,8 @@ use ls_daemon::App;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let mut app = App::try_new().expect("could not create ipc server");
+    let app = App::try_new().expect("could not create ipc server");
 
-    app.ipc.wait_for_client().await;
-
-    eloop(&mut app).await;
-}
-
-async fn eloop(app: &mut App) {
-    // TUN-Device from the tun crate
     let mut dev = app.create_dev().expect("device could not be created");
 
     let mut buf = [0; 4096];
@@ -27,6 +20,6 @@ async fn eloop(app: &mut App) {
         let pkt_size = dev.read(&mut buf).expect("could not read into buffer");
         let pkt = &buf[..pkt_size];
 
-        app.ipc.broadcast(pkt).await;
+        tracing::info!("{pkt:?}");
     }
 }

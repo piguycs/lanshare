@@ -1,13 +1,10 @@
 use std::io;
 
-use coreipc::IpcServer;
-
 #[macro_use]
 extern crate tracing;
 
 pub struct App {
     config: tun::Configuration,
-    pub ipc: IpcServer,
 }
 
 impl App {
@@ -28,9 +25,7 @@ impl App {
         debug!(?config);
         trace!("created App struct");
 
-        let ipc = IpcServer::create_server("lanshare.sock")?;
-
-        Ok(Self { config, ipc })
+        Ok(Self { config })
     }
 
     pub fn create_dev(&self) -> tun::Result<tun::Device> {
