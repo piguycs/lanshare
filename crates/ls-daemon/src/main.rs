@@ -6,6 +6,7 @@ use std::io::Read;
 
 use ls_daemon::App;
 use tokio::net::UnixListener;
+use tun::Device;
 
 #[tokio::main]
 async fn main() {
@@ -14,8 +15,6 @@ async fn main() {
     let app = App::try_new().expect("could not create ipc server");
 
     let mut dev = app.create_dev().expect("device could not be created");
-
-    let mut buf = [0; 4096];
 
     let socket = UnixListener::bind("lanshare.sock").unwrap();
 
@@ -27,13 +26,17 @@ async fn main() {
 
     tokio::select! {
         e = ipc_task => {e.unwrap()},
-        _ = async {
-                loop {
-                    let pkt_size = dev.read(&mut buf).expect("could not read into buffer");
-                    let pkt = &buf[..pkt_size];
-
-                    tracing::info!("{pkt:?}");
-                }
-            } => {}
+        _ = eloop(&mut dev) => {}
     };
+}
+
+async fn eloop(dev: &mut Device) {
+    let mut buf = [0; 4096];
+
+    loop {
+        let pkt_size = dev.read(&mut buf).expect("could not read into buffer");
+        let pkt = &buf[..pkt_size];
+
+        tracing::info!("{pkt:?}");
+    }
 }

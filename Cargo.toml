@@ -21,3 +21,6 @@ tokio = { version = "1.42.0", features = ["macros", "rt-multi-thread", "io-std",
 
 # dependencies from this workspace
 coreipc = { path = "crates/coreipc" }
+
+# libc for accessing linux specific APIs
+libc = "*"

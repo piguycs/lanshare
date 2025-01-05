@@ -249,6 +249,7 @@ dependencies = [
 name = "coreipc"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "rand 0.8.5",
  "temp-env",
  "tempfile",

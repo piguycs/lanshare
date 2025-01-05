@@ -10,6 +10,7 @@ tracing-subscriber.workspace = true
 
 tokio.workspace = true
 rand = "0.8.5"
+libc.workspace = true
 
 [dev-dependencies]
 temp-env = "0.3.6"

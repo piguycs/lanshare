@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::{env, io, path::PathBuf};
 
-use crate::socket::IntoSocket;
+use crate::IntoSocket;
 
 pub const COREIPC_RUNTIME_DIR: &str = "COREIPC_RUNTIME_DIR";
 
