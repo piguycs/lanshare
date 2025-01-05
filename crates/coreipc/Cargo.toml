@@ -12,6 +12,12 @@ tokio.workspace = true
 rand = "0.8.5"
 libc.workspace = true
 
+thiserror.workspace = true
+
+serde.workspace = true
+bincode.workspace = true
+
 [dev-dependencies]
+rstest = "0.24.0"
 temp-env = "0.3.6"
 tempfile = "3.15.0"
