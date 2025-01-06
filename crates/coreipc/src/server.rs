@@ -1,6 +1,6 @@
 //! CoreIPC Server - The owner of the data stream
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncReadExt;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::RwLock;
 
@@ -14,6 +14,7 @@ use crate::IntoSocket;
 
 pub const COREIPC_RUNTIME_DIR: &str = "COREIPC_RUNTIME_DIR";
 
+#[allow(unused)]
 #[derive(Debug)]
 struct ClientStream {
     stream: UnixStream,
@@ -129,13 +130,7 @@ impl Ipc {
 
     #[instrument]
     async fn handle_client(client_id: u16, clients: ClientsArc) {
-        let mut clients = clients.write().await;
-        for client in &mut clients.values_mut() {
-            let socket = &mut client.socket;
-            debug!(?socket);
-            socket.write_all(b"HELLO WORLD").await.unwrap();
-            trace!("wrote to socket");
-        }
+        debug!("TODO: handle client");
     }
 
     #[instrument]

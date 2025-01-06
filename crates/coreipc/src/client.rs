@@ -88,8 +88,6 @@ impl ConnectedClient {
 
     // TODO: I think I will be using a 1:1 channel for this
     pub async fn get_cb(&self) -> Result<()> {
-        let _ = self.recv_socket.accept().await?;
-
         loop {
             if let Ok((mut stream, _)) = self.recv_socket.accept().await {
                 tokio::spawn(async move {
