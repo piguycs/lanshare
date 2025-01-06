@@ -10,3 +10,6 @@ tracing-subscriber.workspace = true
 
 s2n-quic.workspace = true
 tokio.workspace = true
+
+serde.workspace = true
+bincode.workspace = true

@@ -11,3 +11,4 @@ tracing-subscriber.workspace = true
 tokio.workspace = true
 
 coreipc.workspace = true
+relay-server.workspace = true

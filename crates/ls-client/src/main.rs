@@ -14,9 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("starting client");
 
     let client = Client::create_client("lanshare").unwrap();
-    let client = client.connect("lanshare.sock").await.unwrap();
-
-    client.get_cb().await.unwrap();
+    let _client = client.connect("lanshare.sock").await.unwrap();
 
     Ok(())
 }

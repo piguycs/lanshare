@@ -637,6 +637,7 @@ name = "ls-client"
 version = "0.1.0"
 dependencies = [
  "coreipc",
+ "relay-server",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -999,7 +1000,9 @@ checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 name = "relay-server"
 version = "0.1.0"
 dependencies = [
+ "bincode",
  "s2n-quic",
+ "serde",
  "tokio",
  "tracing",
  "tracing-subscriber",

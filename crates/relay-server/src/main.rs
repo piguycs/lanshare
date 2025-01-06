@@ -1,5 +1,5 @@
 //! Relay-Server for LANShare
-//! W.I.P. server for connecting LANShare clients
+//! This is the binary part of the relay server. There is also a library with all the common types
 
 #[macro_use]
 extern crate tracing;
