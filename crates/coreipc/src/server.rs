@@ -1,6 +1,6 @@
 //! CoreIPC Server - The owner of the data stream
 
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::RwLock;
 
@@ -9,6 +9,7 @@ use std::io::{self};
 use std::sync::Arc;
 use std::{env, path::PathBuf};
 
+use crate::wire::ClientHello;
 use crate::IntoSocket;
 
 pub const COREIPC_RUNTIME_DIR: &str = "COREIPC_RUNTIME_DIR";
@@ -16,11 +17,11 @@ pub const COREIPC_RUNTIME_DIR: &str = "COREIPC_RUNTIME_DIR";
 #[derive(Debug)]
 struct ClientStream {
     stream: UnixStream,
-    socket: UnixListener,
+    socket: UnixStream,
 }
 
 impl ClientStream {
-    async fn create(stream: &mut UnixStream) -> io::Result<()> {
+    async fn create(mut stream: UnixStream) -> io::Result<Self> {
         let len = stream.read_u16().await? as usize;
 
         let mut buf = vec![0; len];
@@ -29,11 +30,17 @@ impl ClientStream {
 
         assert_eq!(data, len);
 
-        Ok(())
+        let hello: ClientHello = bincode::deserialize(&buf).unwrap();
+
+        debug!(?hello);
+
+        let socket = UnixStream::connect(hello.socket_path).await.unwrap();
+
+        Ok(ClientStream { stream, socket })
     }
 }
 
-type ClientsArc = Arc<RwLock<HashMap<u16, UnixStream>>>;
+type ClientsArc = Arc<RwLock<HashMap<u16, ClientStream>>>;
 
 #[derive(Debug)]
 pub struct Ipc {
@@ -103,17 +110,17 @@ impl Ipc {
         let clients = Arc::clone(&self.clients);
 
         match self.socket.accept().await {
-            Ok((mut stream, _addr)) => {
+            Ok((stream, _addr)) => {
                 let client_id = rand::random();
                 let mut clients_w = clients.write().await;
 
                 // TODO: remove unwrap
-                ClientStream::create(&mut stream).await.unwrap();
-
-                clients_w.insert(client_id, stream);
+                let cs = ClientStream::create(stream).await.unwrap();
+                clients_w.insert(client_id, cs);
 
                 let clients = Arc::clone(&clients);
 
+                trace!("spawning client handle");
                 tokio::spawn(Self::handle_client(client_id, clients));
             }
             Err(error) => error!("could not accept connection: {error}"),
@@ -122,8 +129,13 @@ impl Ipc {
 
     #[instrument]
     async fn handle_client(client_id: u16, clients: ClientsArc) {
-        debug!(?client_id, ?clients);
-        todo!();
+        let mut clients = clients.write().await;
+        for client in &mut clients.values_mut() {
+            let socket = &mut client.socket;
+            debug!(?socket);
+            socket.write_all(b"HELLO WORLD").await.unwrap();
+            trace!("wrote to socket");
+        }
     }
 
     #[instrument]

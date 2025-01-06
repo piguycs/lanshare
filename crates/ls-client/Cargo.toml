@@ -8,8 +8,6 @@ authors.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
-etherparse.workspace = true
-
-s2n-quic.workspace = true
-
 tokio.workspace = true
+
+coreipc.workspace = true

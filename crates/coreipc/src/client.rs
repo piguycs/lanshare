@@ -9,7 +9,7 @@
 //! ```
 
 use rand::Rng;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
 
 use std::format as f;
@@ -87,9 +87,18 @@ impl ConnectedClient {
     }
 
     // TODO: I think I will be using a 1:1 channel for this
-    pub async fn get_cb<F: Fn(&[u8])>(&self, _cb: F) -> Result<()> {
+    pub async fn get_cb(&self) -> Result<()> {
         let _ = self.recv_socket.accept().await?;
-        todo!()
+
+        loop {
+            if let Ok((mut stream, _)) = self.recv_socket.accept().await {
+                tokio::spawn(async move {
+                    let mut buf = vec![];
+                    let len = stream.read_buf(&mut buf).await.unwrap();
+                    debug!("{:?}", &buf[..len]);
+                });
+            }
+        }
     }
 }
 
