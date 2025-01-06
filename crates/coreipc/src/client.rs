@@ -1,4 +1,12 @@
 //! Client for establishing a bi-directional connection to the server
+//!
+//! ## Example
+//! ```rust
+//! let client = Client::create_client("ipc.client");
+//! let client = client.connnect("ipc.sock"); // the name of your server
+//!
+//! // TODO: get_cb and send documentation
+//! ```
 
 use rand::Rng;
 use tokio::io::AsyncWriteExt;
@@ -47,18 +55,6 @@ impl Client {
         })
     }
 
-    /// Connect to a CoreIPC server
-    /// It is recommended to use this function instead of directly connecting to the server's
-    /// socket. This is because a lot of the features of CoreIPC rely on the connection being
-    /// managed by this library.
-    ///
-    /// ## Example
-    /// ```rust
-    /// let client = Client::create_client("ipc.client");
-    /// let client = client.connnect("ipc.sock"); // the name of your server
-    ///
-    /// // TODO: get_cb and send documentation
-    /// ```
     pub async fn connect<P: AsRef<Path>>(self, path: P) -> Result<ConnectedClient> {
         let mut server = UnixStream::connect(path).await?;
 
@@ -66,6 +62,9 @@ impl Client {
             socket_path: self.socket_path,
         })?;
 
+        assert!(hello.len() < u16::MAX as usize);
+
+        server.write_u16(hello.len() as u16).await?;
         server.write_all(&hello).await?;
 
         Ok(ConnectedClient {

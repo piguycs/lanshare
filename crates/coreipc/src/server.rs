@@ -1,15 +1,37 @@
 //! CoreIPC Server - The owner of the data stream
 
+use tokio::io::AsyncReadExt;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::RwLock;
 
 use std::collections::HashMap;
+use std::io::{self};
 use std::sync::Arc;
-use std::{env, io, path::PathBuf};
+use std::{env, path::PathBuf};
 
 use crate::IntoSocket;
 
 pub const COREIPC_RUNTIME_DIR: &str = "COREIPC_RUNTIME_DIR";
+
+#[derive(Debug)]
+struct ClientStream {
+    stream: UnixStream,
+    socket: UnixListener,
+}
+
+impl ClientStream {
+    async fn create(stream: &mut UnixStream) -> io::Result<()> {
+        let len = stream.read_u16().await? as usize;
+
+        let mut buf = vec![0; len];
+
+        let data = stream.read_exact(&mut buf).await?;
+
+        assert_eq!(data, len);
+
+        Ok(())
+    }
+}
 
 type ClientsArc = Arc<RwLock<HashMap<u16, UnixStream>>>;
 
@@ -81,9 +103,13 @@ impl Ipc {
         let clients = Arc::clone(&self.clients);
 
         match self.socket.accept().await {
-            Ok((stream, _addr)) => {
+            Ok((mut stream, _addr)) => {
                 let client_id = rand::random();
                 let mut clients_w = clients.write().await;
+
+                // TODO: remove unwrap
+                ClientStream::create(&mut stream).await.unwrap();
+
                 clients_w.insert(client_id, stream);
 
                 let clients = Arc::clone(&clients);
