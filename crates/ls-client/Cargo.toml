@@ -10,5 +10,9 @@ tracing-subscriber.workspace = true
 
 tokio.workspace = true
 
+s2n-quic.workspace = true
+
 coreipc.workspace = true
 relay-server.workspace = true
+
+rand.workspace = true

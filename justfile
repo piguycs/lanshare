@@ -11,3 +11,9 @@ set dotenv-load := true
 
 @test:
     cargo nextest run
+
+clean-socks:
+    ls $XDG_RUNTIME_DIR/lanshare-*
+    rm $XDG_RUNTIME_DIR/lanshare-*
+    ls /run/lanshare
+    pkexec rm -r /run/lanshare

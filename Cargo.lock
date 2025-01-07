@@ -637,7 +637,9 @@ name = "ls-client"
 version = "0.1.0"
 dependencies = [
  "coreipc",
+ "rand 0.8.5",
  "relay-server",
+ "s2n-quic",
  "tokio",
  "tracing",
  "tracing-subscriber",
