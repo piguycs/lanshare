@@ -1,28 +1,38 @@
 //! Daemon for LANShare to manage virtual network devices
 //! Creating this allows us to run our client in userspace, as TUN/TAP devices need to be managed
 //! by a superuser. This daemon does that job as a systemd service, using unix sockets for IPC
+//!
+//! This does not need tokio in it's current state, but the quic client will be moved to this in
+//! the future, so as to simplify the client code and allow people to create clients using platform
+//! native APIs more easily. (eg: gtk for gnome, qt for kde, imgui for integration with games)
 
 #![feature(str_as_str)]
+
+mod relay;
 
 #[macro_use]
 extern crate tracing;
 
-use tokio::io::AsyncReadExt;
-use tokio::net::{UnixListener, UnixStream};
+use tokio::{
+    io::AsyncReadExt,
+    net::{UnixListener, UnixStream},
+};
 
-use std::error::Error;
-use std::fs::{self, Permissions};
-use std::net::Ipv4Addr;
-use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
+use std::{
+    error::Error,
+    fs::{self, Permissions},
+    io::Read,
+    net::Ipv4Addr,
+    os::unix::fs::PermissionsExt,
+    path::PathBuf,
+};
 
-const MAX_CLIENTS: usize = 1;
+// TODO:  const MAX_CLIENTS: usize = 1;
+const MTU: u16 = 1500;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt().init();
-
-    // TODO: ensure root
 
     let base_dir = PathBuf::from("/run/lanshare");
 
@@ -39,20 +49,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("set permissions for {socket_dir:?} to 777");
 
     info!("starting event loop");
-    let mut num_clients = 0;
     loop {
         match socket.accept().await {
             Ok((mut stream, _)) => {
-                if num_clients >= MAX_CLIENTS {
-                    warn!(?num_clients, ?MAX_CLIENTS, "too many clients connected!");
-                    continue;
-                }
-
-                num_clients += 1;
-                if let Err(error) = handle_stream(&mut stream).await {
-                    num_clients -= 1;
-                    error!("error when handling stream: {error}");
-                }
+                debug!("spawning a new thread to handle the stream");
+                tokio::spawn(async move {
+                    if let Err(error) = handle_stream(&mut stream).await {
+                        error!("error when handling stream: {error}");
+                    }
+                });
             }
             Err(error) => {
                 error!("could not accept stream: {}", error);
@@ -74,35 +79,36 @@ async fn handle_stream(stream: &mut UnixStream) -> Result<(), Box<dyn Error>> {
     UnixStream::connect(path.as_str()).await?;
     info!("connected to client at {path:?}");
 
-    let dev = get_tun_device(stream).await?;
+    trace!("attempting to create a tun device");
+    let mut dev = get_tun_device(stream).await?;
 
-    Ok(())
+    let mut buf = [0; MTU as usize];
+    loop {
+        let len = dev.read(&mut buf)?;
+        info!("{:?}", &buf[..len]);
+    }
 }
 
 async fn get_tun_device(stream: &mut UnixStream) -> Result<tun::Device, Box<dyn Error>> {
-    debug!("reading the bits for ipv4 address");
+    trace!("reading the bits for ipv4 address");
     let ip_bits = stream.read_u32().await?;
     let ip_addr = Ipv4Addr::from_bits(ip_bits);
     info!("client request provisioning of {ip_addr}");
 
-    debug!("reading the bits for subnet mask");
+    trace!("reading the bits for subnet mask");
     let mask_bits = stream.read_u32().await?;
     let subnet = Ipv4Addr::from_bits(mask_bits);
     info!("client requested a subnetmask of {subnet}");
 
-    debug!("reading the bits for destination");
-    let dest_bits = stream.read_u32().await?;
-    let dest = Ipv4Addr::from_bits(dest_bits);
-    info!("client requested a destination of {dest}");
-
-    // we now start creating the tun device
-    debug!("starting the creation of the tun device");
+    trace!("starting the creation of the tun device");
     let mut config = tun::Configuration::default();
-    config
-        .address(ip_addr)
-        .netmask(subnet)
-        .destination(dest)
-        .up();
 
+    config.platform_config(|config| {
+        config.ensure_root_privileges(true);
+    });
+
+    config.address(ip_addr).netmask(subnet).mtu(MTU).up();
+
+    info!("tun device has been created");
     Ok(tun::create(&config)?)
 }

@@ -1,15 +1,23 @@
 //! LANShare Client application
 
-mod handler;
+#![feature(ip_from)]
 
-use std::{
-    env, error::Error, io, net::SocketAddr, os::unix::ffi::OsStrExt, path::PathBuf, sync::LazyLock,
-};
+mod handler;
 
 use rand::Rng;
 use tokio::{
     io::AsyncWriteExt,
     net::{UnixListener, UnixStream},
+};
+
+use std::{
+    env,
+    error::Error,
+    io,
+    net::{Ipv4Addr, SocketAddr},
+    os::unix::ffi::OsStrExt,
+    path::PathBuf,
+    sync::LazyLock,
 };
 
 #[macro_use]
@@ -97,6 +105,17 @@ async fn send_hello(server: &mut UnixStream, socket_path: PathBuf) -> Result<(),
     buffer.extend_from_slice(msg);
 
     server.write_all(&buffer).await?;
+
+    // tun address
+    // TODO: get this address from the control server
+    server
+        .write_u32(u32::from(Ipv4Addr::new(25, 0, 0, 2)))
+        .await?;
+
+    // subnet mask
+    server
+        .write_u32(u32::from(Ipv4Addr::new(255, 0, 0, 0)))
+        .await?;
 
     Ok(())
 }

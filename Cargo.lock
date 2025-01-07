@@ -636,7 +636,6 @@ checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 name = "ls-client"
 version = "0.1.0"
 dependencies = [
- "coreipc",
  "rand 0.8.5",
  "relay-server",
  "s2n-quic",
@@ -649,7 +648,6 @@ dependencies = [
 name = "ls-daemon"
 version = "0.1.0"
 dependencies = [
- "coreipc",
  "tokio",
  "tracing",
  "tracing-subscriber",
