@@ -1,18 +1,16 @@
 [package]
-name = "ls-client"
-version = "0.1.0"
+name = "relay-server"
 edition.workspace = true
+version.workspace = true
+license.workspace = true
 authors.workspace = true
 
 [dependencies]
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
+s2n-quic.workspace = true
 tokio.workspace = true
 
-s2n-quic.workspace = true
-
-# coreipc.workspace = true
-relay-server.workspace = true
-
-rand.workspace = true
+serde.workspace = true
+bincode.workspace = true

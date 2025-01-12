@@ -1,0 +1,17 @@
+[package]
+name = "ls-daemon"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+s2n-quic.workspace = true
+
+tokio.workspace = true
+
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+tun.workspace = true
