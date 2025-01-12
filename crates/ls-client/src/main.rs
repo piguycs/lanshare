@@ -1,5 +1,7 @@
 //! LANShare Client application
 
+// TODO: redo this to be a "thin" client
+
 #![feature(ip_from)]
 
 mod handler;
