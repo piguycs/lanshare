@@ -1,5 +1,5 @@
-use tokio::sync::mpsc;
-use tun::Device;
+use tokio::sync::{broadcast, mpsc};
+use tun::Configuration as TunConfig;
 
 use crate::{daemon::DaemonEvent, error};
 
@@ -12,7 +12,7 @@ pub struct TunController {
 
 impl TunController {
     pub fn new() -> Self {
-        let mut config = tun::Configuration::default();
+        let mut config = TunConfig::default();
         config
             .address((25, 0, 0, 2))
             .netmask((255, 0, 0, 0))
@@ -26,12 +26,10 @@ impl TunController {
     pub async fn listen(
         &mut self,
         mut rx: mpsc::Receiver<DaemonEvent>,
-        mut tun_tx: mpsc::Sender<Option<Device>>,
+        mut tun_tx: broadcast::Sender<Option<TunConfig>>,
     ) -> error::Result<()> {
         loop {
-            trace!("LOOP DE LOOP");
             if let Some(event) = rx.recv().await {
-                trace!("got event!!");
                 self.handle_event(event, &mut tun_tx).await;
             } else {
                 debug!("channel has been closed");
@@ -44,16 +42,15 @@ impl TunController {
     async fn handle_event(
         &mut self,
         event: DaemonEvent,
-        tun_tx: &mut mpsc::Sender<Option<Device>>,
+        tun_tx: &mut broadcast::Sender<Option<TunConfig>>,
     ) {
         trace!("TunController recieved event");
         match event {
             DaemonEvent::Up => {
-                let device = tun::create(&self.config).unwrap();
-                tun_tx.send(Some(device)).await.unwrap();
+                tun_tx.send(Some(self.config.clone())).unwrap();
             }
             DaemonEvent::Down => {
-                tun_tx.send(None).await.unwrap();
+                tun_tx.send(None).unwrap();
             }
         }
 

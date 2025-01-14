@@ -7,10 +7,11 @@ mod daemon;
 mod error;
 mod tun;
 
-use tokio::sync::mpsc;
-use zbus::connection;
-
 use std::io::Read;
+
+use ::tun::Configuration as TunConfig;
+use tokio::sync::{broadcast, mpsc};
+use zbus::connection;
 
 use crate::{
     daemon::{DaemonEvent, DbusDaemon},
@@ -23,9 +24,10 @@ async fn main() -> error::Result<()> {
     info!("hello from daemon");
 
     // channel for recieving events from dbus
-    let (tx, rx) = mpsc::channel::<DaemonEvent>(2);
+    let (tx, rx) = mpsc::channel::<DaemonEvent>(1);
     // channel for recieving tun device from TunController
-    let (tun_tx, tun_rx) = mpsc::channel::<Option<::tun::Device>>(2);
+    let (tun_tx, tun_rx) = broadcast::channel::<Option<TunConfig>>(1);
+    let tun_rx2 = tun_tx.subscribe();
 
     let greeter = DbusDaemon::new(tx);
 
@@ -41,7 +43,7 @@ async fn main() -> error::Result<()> {
 
     let res = tokio::select! {
         res = tc.listen(rx, tun_tx) => res,
-        _ = device_task(tun_rx) => Ok(()),
+        _ = device_task(tun_rx, tun_rx2) => Ok(()),
     };
 
     if let Err(error) = &res {
@@ -52,24 +54,24 @@ async fn main() -> error::Result<()> {
     Ok(())
 }
 
-// FIXME: unable to put a non blocking loop here
-#[instrument(skip(tx))]
-async fn device_task(mut tx: mpsc::Receiver<Option<::tun::Device>>) {
+#[instrument(skip(rx1, rx2))]
+async fn device_task(
+    mut rx1: broadcast::Receiver<Option<TunConfig>>,
+    mut rx2: broadcast::Receiver<Option<TunConfig>>,
+) {
     loop {
-        match tx.recv().await {
-            Some(Some(_device)) => {
-                info!("recieved a device, running event loop");
+        if let Ok(Some(config)) = rx1.recv().await {
+            let mut device = ::tun::create(&config).unwrap();
+            let mut buf = [0; 1024];
 
-                if tx.try_recv().is_ok() {
-                    info!("command to drop device recieved, breaking device event loop");
+            loop {
+                let amount = device.read(&mut buf).unwrap();
+                trace!("read {amount} bytes");
+
+                if let Ok(None) = rx2.recv().await {
+                    debug!("signal down recv");
                     break;
-                };
-            }
-            Some(None) => {
-                warn!("no device present to drop");
-            }
-            None => {
-                debug!("channel dropped");
+                }
             }
         }
     }
