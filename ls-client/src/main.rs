@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate tracing;
 
+use std::io::Write;
+
 use zbus::{Connection, Result};
 
 use ls_client::*;
@@ -23,6 +25,9 @@ async fn main() -> Result<()> {
 
 async fn repl(proxy: DaemonProxy<'_>) {
     loop {
+        print!("> ");
+        let _ = std::io::stdout().flush();
+
         let stdin = std::io::stdin();
         let mut buf = String::new();
 
