@@ -1,0 +1,13 @@
+[Unit]
+Description=LAN-Share Daemon
+After=dbus.service
+After=pre-network.target
+
+[Service]
+# TODO: this file does nothing ._.
+# 1. Allow access only to the resources required using CapabilityBoundingSet
+ExecStart=/usr/bin/echo
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
