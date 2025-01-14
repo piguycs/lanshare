@@ -13,5 +13,9 @@ tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
+serde.workspace = true
+thiserror.workspace = true
+
 [target.'cfg(target_os = "linux")'.dependencies]
 tun.workspace = true
+zbus.workspace = true
