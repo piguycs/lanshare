@@ -1,2 +1,2 @@
 [env]
-RUST_LOG = "trace"
+RUST_LOG = "ls_daemon=trace,ls_client=trace,relay_server=trace,info"
