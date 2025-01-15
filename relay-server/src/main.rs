@@ -4,7 +4,11 @@
 #[macro_use]
 extern crate tracing;
 
+use std::sync::Arc;
+
+use relay_server::types::Actions;
 use s2n_quic::{stream::BidirectionalStream, Connection, Server};
+use tokio::sync::Mutex;
 
 type BoxError = Box<dyn std::error::Error>;
 
@@ -17,6 +21,9 @@ static KEY: &str = include_str!("../../certs/key.pem");
 async fn main() -> Result<(), BoxError> {
     tracing_subscriber::fmt::init();
 
+    let db_conn = relay_server::db::gen_mem_db();
+    let db_conn = Arc::new(Mutex::new(db_conn));
+
     let mut server = Server::builder()
         .with_io(SOCKET_ADDR)?
         .with_tls((CERT, KEY))?
@@ -24,25 +31,26 @@ async fn main() -> Result<(), BoxError> {
 
     trace!("accepting connections");
     while let Some(connection) = server.accept().await {
-        tokio::spawn(handle_connection(connection));
+        tokio::spawn(handle_connection(connection, db_conn.clone()));
     }
 
     Ok(())
 }
 
-async fn handle_connection(mut connection: Connection) {
+async fn handle_connection(mut connection: Connection, db_conn: Arc<Mutex<sqlite::Connection>>) {
     info!("Connection accepted from {:?}", connection.remote_addr());
 
     while let Ok(Some(stream)) = connection.accept_bidirectional_stream().await {
-        tokio::spawn(handle_stream(stream));
+        tokio::spawn(handle_stream(stream, db_conn.clone()));
     }
 }
 
-async fn handle_stream(mut stream: BidirectionalStream) {
+async fn handle_stream(mut stream: BidirectionalStream, db_conn: Arc<Mutex<sqlite::Connection>>) {
     info!("Stream opened from {:?}", stream.connection().remote_addr());
 
     while let Ok(Some(data)) = stream.receive().await {
-        debug!("stream sent {:?}", String::from_utf8(data.to_vec()));
+        let actions: Actions = bincode::deserialize(&data).unwrap();
+        debug!("stream sent {actions:?}");
 
         stream
             .send("ACK".into())

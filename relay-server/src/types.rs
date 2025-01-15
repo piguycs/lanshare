@@ -1,4 +1,6 @@
-pub struct Identity {
-    pub name: String,
-    pub password: String,
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Actions {
+    Login { name: String },
 }
