@@ -774,7 +774,7 @@ dependencies = [
 name = "ls-daemon"
 version = "0.1.0-dev"
 dependencies = [
- "s2n-quic",
+ "relay-server",
  "serde",
  "thiserror",
  "tokio",

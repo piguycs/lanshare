@@ -1,14 +1,8 @@
-//! Relay-Server for LANShare
-//! This is the binary part of the relay server. There is also a library with all the common types
-
 #[macro_use]
 extern crate tracing;
 
-use std::sync::Arc;
-
-use relay_server::types::Actions;
+use relay_server::db::Db;
 use s2n_quic::{stream::BidirectionalStream, Connection, Server};
-use tokio::sync::Mutex;
 
 type BoxError = Box<dyn std::error::Error>;
 
@@ -21,8 +15,7 @@ static KEY: &str = include_str!("../../certs/key.pem");
 async fn main() -> Result<(), BoxError> {
     tracing_subscriber::fmt::init();
 
-    let db_conn = relay_server::db::gen_mem_db();
-    let db_conn = Arc::new(Mutex::new(db_conn));
+    let db_conn = Db::get_db();
 
     let mut server = Server::builder()
         .with_io(SOCKET_ADDR)?
@@ -37,7 +30,7 @@ async fn main() -> Result<(), BoxError> {
     Ok(())
 }
 
-async fn handle_connection(mut connection: Connection, db_conn: Arc<Mutex<sqlite::Connection>>) {
+async fn handle_connection(mut connection: Connection, db_conn: Db) {
     info!("Connection accepted from {:?}", connection.remote_addr());
 
     while let Ok(Some(stream)) = connection.accept_bidirectional_stream().await {
@@ -45,13 +38,12 @@ async fn handle_connection(mut connection: Connection, db_conn: Arc<Mutex<sqlite
     }
 }
 
-async fn handle_stream(mut stream: BidirectionalStream, db_conn: Arc<Mutex<sqlite::Connection>>) {
+async fn handle_stream(mut stream: BidirectionalStream, db_conn: Db) {
     info!("Stream opened from {:?}", stream.connection().remote_addr());
 
     while let Ok(Some(data)) = stream.receive().await {
-        let actions: Actions = bincode::deserialize(&data).unwrap();
-        debug!("stream sent {actions:?}");
-
+        db_conn.query("select 1 + 1").await;
+        info!("data: {}", String::from_utf8_lossy(&data));
         stream
             .send("ACK".into())
             .await

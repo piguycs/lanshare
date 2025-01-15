@@ -38,9 +38,13 @@ async fn repl(proxy: DaemonProxy<'_>) {
         let res = match buf.as_str().trim() {
             "up" => proxy.int_up().await,
             "down" => proxy.int_down().await,
+            name if name.starts_with("name") => {
+                let name = &name[5..];
+                proxy.login(name).await
+            }
             "quit" => break,
             _ => {
-                println!("enter command 'up', 'down' or 'quit'");
+                println!("enter command 'up', 'down', 'name <name>' or 'quit'");
                 continue;
             }
         };

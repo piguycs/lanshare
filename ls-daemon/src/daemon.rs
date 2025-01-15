@@ -1,3 +1,4 @@
+use relay_server::client::{Client, LoginS, Sender};
 use tokio::sync::mpsc;
 
 #[cfg(target_os = "linux")]
@@ -10,7 +11,7 @@ pub enum DaemonEvent {
 }
 
 pub trait Daemon {
-    async fn login(&self) -> usize;
+    async fn login(&self, username: &str) -> usize;
     async fn int_up(&self) -> usize;
     async fn int_down(&self) -> usize;
 
@@ -28,6 +29,7 @@ pub trait Daemon {
 
 #[cfg(target_os = "linux")]
 mod dbus {
+    use tokio::sync::Mutex;
     use zbus::interface;
 
     use super::*;
@@ -35,19 +37,29 @@ mod dbus {
     #[derive(Debug)]
     pub struct DbusDaemon {
         tx: mpsc::Sender<DaemonEvent>,
+        relay_client: Mutex<Client>,
     }
 
     impl DbusDaemon {
-        pub fn new(tx: mpsc::Sender<DaemonEvent>) -> Self {
-            Self { tx }
+        pub async fn new(tx: mpsc::Sender<DaemonEvent>) -> Self {
+            let relay_client = Mutex::new(Client::create().await);
+            Self { tx, relay_client }
         }
     }
 
     #[interface(name = "me.piguy.lanshare.daemon1")]
     impl Daemon for DbusDaemon {
         #[instrument(skip(self))]
-        async fn login(&self) -> usize {
-            todo!()
+        async fn login(&self, username: &str) -> usize {
+            let mut client = self.relay_client.lock().await;
+
+            client
+                .send(LoginS {
+                    name: username.to_string(),
+                })
+                .await;
+
+            0
         }
 
         #[instrument(skip(self))]
