@@ -1,8 +1,10 @@
 #[macro_use]
 extern crate tracing;
 
-use relay_server::db::Db;
+use rand::Rng;
+use relay_server::{db::Db, types::Actions};
 use s2n_quic::{stream::BidirectionalStream, Connection, Server};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 type BoxError = Box<dyn std::error::Error>;
 
@@ -41,12 +43,35 @@ async fn handle_connection(mut connection: Connection, db_conn: Db) {
 async fn handle_stream(mut stream: BidirectionalStream, db_conn: Db) {
     info!("Stream opened from {:?}", stream.connection().remote_addr());
 
-    while let Ok(Some(data)) = stream.receive().await {
-        db_conn.query("select 1 + 1").await;
-        info!("data: {}", String::from_utf8_lossy(&data));
-        stream
-            .send("ACK".into())
-            .await
-            .expect("stream should be open");
+    loop {
+        let len = stream.read_u32().await.unwrap();
+        info!(?len);
+        let mut buf = vec![0; len as usize];
+        if let Ok(amount) = stream.read_exact(&mut buf).await {
+            info!("got here");
+            if let Ok(Actions::Login { name }) = bincode::deserialize::<Actions>(&buf[..amount]) {
+                db_conn.query("select 1 + 1").await;
+                info!("data: {name}");
+
+                let rand_ip = ip();
+
+                stream.write_u32(rand_ip).await.unwrap();
+            } else {
+                warn!("nope");
+            }
+        }
     }
+}
+
+fn ip() -> u32 {
+    let mut rng = rand::thread_rng();
+
+    // The first octet is fixed as 25. The rest are random.
+    let first_octet = 25u32 << 24; // Shift 25 to the most significant byte.
+    let second_octet = (rng.gen_range(0..=255) as u32) << 16;
+    let third_octet = (rng.gen_range(0..=255) as u32) << 8;
+    let fourth_octet = rng.gen_range(0..=255) as u32;
+
+    // Combine the octets into a single u32.
+    first_octet | second_octet | third_octet | fourth_octet
 }

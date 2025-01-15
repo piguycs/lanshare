@@ -1125,6 +1125,7 @@ name = "relay-server"
 version = "0.1.0-dev"
 dependencies = [
  "bincode",
+ "rand 0.8.5",
  "s2n-quic",
  "serde",
  "sqlite",

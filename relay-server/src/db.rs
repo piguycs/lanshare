@@ -21,6 +21,9 @@ impl Db<MemSqlite> {
     pub fn get_db() -> Self {
         let conn = sqlite::open(":memory:").unwrap();
 
+        conn.execute(include_str!("../schemas/user-table.sql"))
+            .unwrap();
+
         Self {
             db_conn: Arc::new(Mutex::new(conn)),
             db_type: PhantomData,
