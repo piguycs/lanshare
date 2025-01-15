@@ -1,11 +1,9 @@
-I need to make coreipc more reliable and less of a "non-rust" mess. I am using
-a bunch of unwraps, and expecting the consumer of the api to keep a track of
-the state. Well, I am the consumer of the API and I dont trust myself with that.
+- D-Bus signals for
+    1. Sending errors
+    2. Sending updates to the state
 
-And I also need to make the messaging bits more bi-directional and robust 
-against reconnects. I should also be able to support multiple clients. The plan
-is to have a proper API to communicate with the daemon. Right now I do it in a
-very hacky manner
-
-Well, I will take a small break from this, I need to finish my Advent of Code
-for last year, as I have not yet done it all.
+We will be using signals for the above 2, because the daemon will be mostly
+asynchronous. Once client sends an event, the client's job is done. The daemon
+will do whatever with the event, and emit any state changes or errors. Then the
+client will do whatever it wants with that info. Neither the daemon or the 
+client is dependent on each other to complete their task.
