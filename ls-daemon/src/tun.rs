@@ -1,21 +1,32 @@
-use tokio::sync::{broadcast, mpsc};
-use tun::Configuration as TunConfig;
+use tokio::sync::{
+    broadcast::{self, error::SendError},
+    mpsc,
+};
+use tun::{Configuration as TunConfig, ToAddress};
 
 use crate::{daemon::DaemonEvent, error};
 
 pub const DEFAULT_MTU: u16 = 1500;
 
+#[derive(Debug, Clone)]
+pub enum TunEvent {
+    Up(TunConfig),
+    Down,
+}
+
 #[derive(Debug)]
 pub struct TunController {
-    config: tun::Configuration,
+    config: TunConfig,
 }
 
 impl TunController {
-    pub fn new() -> Self {
+    pub fn new<T: ToAddress>(address: T, netmask: T) -> Self {
         let mut config = TunConfig::default();
+
         config
-            .address((25, 0, 0, 2))
-            .netmask((255, 0, 0, 0))
+            .tun_name("lanshare0")
+            .address(address)
+            .netmask(netmask)
             .mtu(DEFAULT_MTU)
             .up();
 
@@ -26,7 +37,7 @@ impl TunController {
     pub async fn listen(
         &mut self,
         mut rx: mpsc::Receiver<DaemonEvent>,
-        mut tun_tx: broadcast::Sender<Option<TunConfig>>,
+        mut tun_tx: broadcast::Sender<TunEvent>,
     ) -> error::Result<()> {
         loop {
             if let Some(event) = rx.recv().await {
@@ -39,21 +50,24 @@ impl TunController {
     }
 
     #[instrument(skip(self, tun_tx))]
-    async fn handle_event(
-        &mut self,
-        event: DaemonEvent,
-        tun_tx: &mut broadcast::Sender<Option<TunConfig>>,
-    ) {
+    async fn handle_event(&mut self, event: DaemonEvent, tun_tx: &mut broadcast::Sender<TunEvent>) {
         trace!("TunController recieved event");
         match event {
             DaemonEvent::Up => {
-                tun_tx.send(Some(self.config.clone())).unwrap();
+                let config = self.config.clone();
+                handle_send_res(tun_tx.send(TunEvent::Up(config)));
             }
             DaemonEvent::Down => {
-                tun_tx.send(None).unwrap();
+                handle_send_res(tun_tx.send(TunEvent::Down));
             }
         }
 
         trace!("TunController event handeled");
+    }
+}
+
+fn handle_send_res<T: std::fmt::Debug>(res: Result<usize, SendError<T>>) {
+    if let Err(error) = res {
+        error!("no active recievers to recieve {:?}", error.0);
     }
 }

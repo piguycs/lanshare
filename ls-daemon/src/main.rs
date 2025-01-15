@@ -9,8 +9,8 @@ mod tun;
 
 use std::io::Read;
 
-use ::tun::Configuration as TunConfig;
 use tokio::sync::{broadcast, mpsc};
+use tun::TunEvent;
 use zbus::connection;
 
 use crate::{
@@ -26,24 +26,38 @@ async fn main() -> error::Result<()> {
     // channel for recieving events from dbus
     let (tx, rx) = mpsc::channel::<DaemonEvent>(1);
     // channel for recieving tun device from TunController
-    let (tun_tx, tun_rx) = broadcast::channel::<Option<TunConfig>>(1);
+    let (tun_tx, tun_rx1) = broadcast::channel::<TunEvent>(1);
     let tun_rx2 = tun_tx.subscribe();
 
-    let greeter = DbusDaemon::new(tx);
+    // NOTE: the code will simply do nothing if not on linux.
+    // - The main blocker is that I dont know how my code will be architected for them.
+    //   I might need to move the relay connectors to a lib, and make multiple bins.
+    #[cfg(target_os = "linux")]
+    let _conn = {
+        let daemon = DbusDaemon::new(tx);
 
-    let _conn = connection::Builder::system()?
-        .name("me.piguy.lanshare.daemon")?
-        .serve_at("/me/piguy/lanshare/daemon", greeter)?
-        .build()
-        .await?;
+        let conn = connection::Builder::system()?
+            .name("me.piguy.lanshare.daemon")?
+            .serve_at("/me/piguy/lanshare/daemon", daemon)?
+            .build()
+            .await?;
 
-    info!("listening on dbus");
+        info!("listening on dbus");
 
-    let mut tc = TunController::new();
+        conn
+    };
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        error!("this platform is not supported, the daemon will do nothing");
+    }
+
+    // HACK: the ip and netmask needs to be set by the relay after login
+    let mut tc = TunController::new("25.0.0.2", "255.0.0.0");
 
     let res = tokio::select! {
         res = tc.listen(rx, tun_tx) => res,
-        _ = device_task(tun_rx, tun_rx2) => Ok(()),
+        _ = device_task(tun_rx1, tun_rx2) => Ok(()),
     };
 
     if let Err(error) = &res {
@@ -56,20 +70,32 @@ async fn main() -> error::Result<()> {
 
 #[instrument(skip(rx1, rx2))]
 async fn device_task(
-    mut rx1: broadcast::Receiver<Option<TunConfig>>,
-    mut rx2: broadcast::Receiver<Option<TunConfig>>,
+    mut rx1: broadcast::Receiver<TunEvent>,
+    mut rx2: broadcast::Receiver<TunEvent>,
 ) {
     loop {
-        if let Ok(Some(config)) = rx1.recv().await {
-            let mut device = ::tun::create(&config).unwrap();
+        if let Ok(TunEvent::Up(config)) = rx1.recv().await {
+            let mut device = match ::tun::create(&config) {
+                Ok(value) => value,
+                Err(error) => {
+                    error!("{error}");
+                    continue;
+                }
+            };
             let mut buf = [0; 1024];
 
             loop {
-                let amount = device.read(&mut buf).unwrap();
+                let amount = match device.read(&mut buf) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        error!("{error}");
+                        continue;
+                    }
+                };
                 trace!("read {amount} bytes");
 
-                if let Ok(None) = rx2.recv().await {
-                    debug!("signal down recv");
+                if let Ok(TunEvent::Down) = rx2.recv().await {
+                    debug!("recieved tun down event");
                     break;
                 }
             }
