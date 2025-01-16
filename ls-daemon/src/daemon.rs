@@ -1,5 +1,6 @@
-use relay_server::client::{Client, LoginS, Sender};
 use tokio::sync::mpsc;
+
+use relay_server::client::Client;
 
 #[cfg(target_os = "linux")]
 pub(super) use dbus::*;
@@ -51,13 +52,9 @@ mod dbus {
     impl Daemon for DbusDaemon {
         #[instrument(skip(self))]
         async fn login(&self, username: &str) -> usize {
-            let mut client = self.relay_client.lock().await;
+            let _client = self.relay_client.lock().await;
 
-            client
-                .send(LoginS {
-                    name: username.to_string(),
-                })
-                .await;
+            todo!();
 
             0
         }
