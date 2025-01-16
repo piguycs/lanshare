@@ -10,9 +10,15 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 
 s2n-quic.workspace = true
+
 tokio.workspace = true
+tokio-util = { version = "0.7.13", features = ["io", "io-util", "compat"] }
 
 bincode.workspace = true
 serde.workspace = true
-sqlite.workspace = true
+
 rand.workspace = true
+thiserror.workspace = true
+
+#sqlite.workspace = true
+rusqlite.workspace = true

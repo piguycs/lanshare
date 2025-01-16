@@ -2,11 +2,11 @@ use s2n_quic::{
     client::Connect,
     stream::{ReceiveStream, SendStream},
 };
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::SocketAddr;
 
-use crate::types::Actions;
+use crate::types::Action;
 
 static CERT: &str = include_str!("../../certs/cert.pem");
 
@@ -53,11 +53,8 @@ pub trait Sender<S, R> {
 
 impl Sender<LoginS, LoginR> for Client {
     async fn send(&mut self, s: LoginS) -> LoginR {
-        let data = bincode::serialize(&Actions::Login { name: s.name }).unwrap();
-        self.send.write_u32(data.len() as u32).await.unwrap();
+        let data = bincode::serialize(&Action::Login { name: s.name }).unwrap();
         self.send.write_all(&data).await.unwrap();
-        let ip = self.recv.read_u32().await.unwrap();
-        info!("IP: {}", Ipv4Addr::from(ip));
 
         // TODO: todo
         LoginR
