@@ -34,7 +34,7 @@ pub struct Server {
 
 impl Server {
     pub fn try_new() -> Result<Self> {
-        let db = db::Db::get_db();
+        let db = db::Db::try_new()?;
 
         let server = QuicServer::builder()
             .with_io(SOCKET_ADDR)

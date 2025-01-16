@@ -6,6 +6,8 @@ pub type Result<T = ()> = std::result::Result<T, Error>;
 pub enum Error {
     #[error("quic error: {}", 0)]
     QuicError(#[from] QuicError),
+    #[error("sqlite error: {}", 0)]
+    SqliteError(#[from] rusqlite::Error),
 }
 
 #[derive(Debug, thiserror::Error)]
