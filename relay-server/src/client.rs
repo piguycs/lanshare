@@ -7,7 +7,7 @@ use bincode::Options;
 use s2n_quic::{client::Connect, Client as QuicClient};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::{error::*, types::Action, BINCODE, CERT, PUBLIC_SOCKET_ADDR};
+use crate::{action::Action, error::*, BINCODE, CERT, PUBLIC_SOCKET_ADDR};
 
 #[derive(Debug)]
 pub struct Client {

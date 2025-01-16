@@ -1,10 +1,10 @@
 #[macro_use]
 extern crate tracing;
 
+mod action;
 pub mod client;
 mod db;
 pub mod error;
-mod types;
 
 use std::{net::Ipv4Addr, sync::LazyLock};
 
@@ -12,8 +12,7 @@ use bincode::Options;
 use s2n_quic::{Connection, Server as QuicServer};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use error::*;
-use types::Action;
+use crate::{action::Action, error::*};
 
 const SOCKET_ADDR: &str = "0.0.0.0:4433";
 const PUBLIC_SOCKET_ADDR: &str = "127.0.0.1:4433";
@@ -85,7 +84,7 @@ async fn handle_connection(mut connection: Connection, db: db::Db) {
     debug!(?buf);
     drop(recv_stream);
 
-    let action = match action {
+    let action: Action = match action {
         Ok(value) => value,
         // void return, acts as an early exit
         Err(error) => return error!(?error, "{error}"),
@@ -93,16 +92,7 @@ async fn handle_connection(mut connection: Connection, db: db::Db) {
 
     info!("reading action boobs");
 
-    match action {
-        Action::Login { name } => {
-            info!(?name);
-            let mut send_stream = connection.open_send_stream().await.unwrap();
-            let data = BINCODE
-                .serialize(&(Ipv4Addr::new(0, 0, 0, 0), (Ipv4Addr::new(0, 0, 0, 0))))
-                .unwrap();
-            send_stream.write_all(&data).await.unwrap();
-        }
-    };
+    action.handle(connection, db).await;
 
     info!("connection ended");
 }
