@@ -30,7 +30,6 @@ pub trait Daemon {
 
 #[cfg(target_os = "linux")]
 mod dbus {
-    use tokio::sync::Mutex;
     use zbus::interface;
 
     use super::*;
@@ -38,12 +37,13 @@ mod dbus {
     #[derive(Debug)]
     pub struct DbusDaemon {
         tx: mpsc::Sender<DaemonEvent>,
-        relay_client: Mutex<Client>,
+        relay_client: Client,
     }
 
     impl DbusDaemon {
         pub async fn new(tx: mpsc::Sender<DaemonEvent>) -> Self {
-            let relay_client = Mutex::new(Client::create().await);
+            // TODO: remove unwrap
+            let relay_client = Client::try_new().await.unwrap();
             Self { tx, relay_client }
         }
     }
@@ -52,9 +52,11 @@ mod dbus {
     impl Daemon for DbusDaemon {
         #[instrument(skip(self))]
         async fn login(&self, username: &str) -> usize {
-            let _client = self.relay_client.lock().await;
-
-            todo!();
+            let client = &self.relay_client;
+            if let Err(error) = client.login(username).await {
+                error!("could not login user: {error}");
+                return 1;
+            }
 
             0
         }

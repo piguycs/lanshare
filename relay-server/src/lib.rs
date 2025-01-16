@@ -6,16 +6,17 @@ mod db;
 pub mod error;
 mod types;
 
-use std::sync::LazyLock;
+use std::{net::Ipv4Addr, sync::LazyLock};
 
 use bincode::Options;
 use s2n_quic::{Connection, Server as QuicServer};
-use tokio_util::io::SyncIoBridge;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use error::*;
 use types::Action;
 
 const SOCKET_ADDR: &str = "0.0.0.0:4433";
+const PUBLIC_SOCKET_ADDR: &str = "127.0.0.1:4433";
 
 static CERT: &str = include_str!("../../certs/cert.pem");
 static KEY: &str = include_str!("../../certs/key.pem");
@@ -24,7 +25,7 @@ const BINCODE_BYTE_LIMIT: u64 = 16 * 1024;
 type BincodeConfig =
     bincode::config::WithOtherLimit<bincode::DefaultOptions, bincode::config::Bounded>;
 
-static BINCODE: LazyLock<BincodeConfig> =
+pub static BINCODE: LazyLock<BincodeConfig> =
     LazyLock::new(|| bincode::DefaultOptions::new().with_limit(BINCODE_BYTE_LIMIT));
 
 pub struct Server {
@@ -33,8 +34,11 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn try_new() -> Result<Self> {
-        let db = db::Db::try_new()?;
+    pub async fn try_new() -> Result<Self> {
+        let db = db::Db::try_new().await?;
+
+        let schema = include_str!("../schemas/user-table.sql");
+        db.load_schema(schema).await?;
 
         let server = QuicServer::builder()
             .with_io(SOCKET_ADDR)
@@ -67,31 +71,36 @@ impl Server {
 #[instrument(skip(connection, db), fields(remote_addr = ?connection.remote_addr()))]
 async fn handle_connection(mut connection: Connection, db: db::Db) {
     info!("Connection accepted from {:?}", connection.remote_addr());
-    let recv_stream = match connection.accept_receive_stream().await {
-        Ok(Some(value)) => {
-            info!("WHAT THE FUCK BRO 1");
-            value
-        }
+    let mut recv_stream = match connection.accept_receive_stream().await {
+        Ok(Some(value)) => value,
         // void returns, acts as an early exit
         Ok(None) => return debug!("stream was closed without an error"),
         Err(error) => return error!("{error}"),
     };
-    info!("WHAT THE FUCK BRO 1");
 
     // TODO: BAD because blocking IO
-    info!("reading action boobs");
-    let action: Action = match BINCODE.deserialize_from(SyncIoBridge::new(recv_stream)) {
+    let mut buf = vec![];
+    let _len = recv_stream.read_buf(&mut buf).await.unwrap();
+    let action = BINCODE.deserialize(&buf);
+    debug!(?buf);
+    drop(recv_stream);
+
+    let action = match action {
         Ok(value) => value,
         // void return, acts as an early exit
-        Err(error) => return error!("{error}"),
+        Err(error) => return error!(?error, "{error}"),
     };
 
     info!("reading action boobs");
 
     match action {
-        Action::Login { .. } => warn!("login is yet to be implimented"),
-        Action::Test => {
-            db.query("select 1 + 1").await;
+        Action::Login { name } => {
+            info!(?name);
+            let mut send_stream = connection.open_send_stream().await.unwrap();
+            let data = BINCODE
+                .serialize(&(Ipv4Addr::new(0, 0, 0, 0), (Ipv4Addr::new(0, 0, 0, 0))))
+                .unwrap();
+            send_stream.write_all(&data).await.unwrap();
         }
     };
 
