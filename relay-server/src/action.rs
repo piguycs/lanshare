@@ -1,3 +1,4 @@
+use response::LoginResp;
 use s2n_quic::Connection;
 use serde::{Deserialize, Serialize};
 
@@ -28,12 +29,32 @@ impl Action {
                 };
                 info!("user {name} has been assigned address {address} and netmask {netmask}");
 
-                let data = wire::serialise_stream(&mut send_stream, &(address, netmask)).await;
+                let resp = LoginResp { address, netmask };
+                let data = wire::serialise_stream(&mut send_stream, &resp).await;
 
                 if let Err(error) = data {
                     error!("{error}");
                 }
             }
         };
+    }
+}
+
+// TODO: impliment this for a server handler too, so we have a consistency of API
+#[trait_variant::make(Send)]
+pub trait ServerApi {
+    async fn login(&self, username: &str) -> Result<LoginResp>;
+    async fn upgrade_conn(&self) -> Result<()>;
+}
+
+pub mod response {
+    use super::*;
+
+    use std::net::Ipv4Addr;
+
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct LoginResp {
+        pub address: Ipv4Addr,
+        pub netmask: Ipv4Addr,
     }
 }

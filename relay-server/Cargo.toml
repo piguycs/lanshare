@@ -18,6 +18,7 @@ serde.workspace = true
 
 rand.workspace = true
 thiserror.workspace = true
+trait-variant.workspace = true
 
 #sqlite.workspace = true
 rusqlite.workspace = true

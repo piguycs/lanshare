@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 use tokio::sync::mpsc;
 
 use errors::*;
-use relay_server::client::Client;
+use relay_server::client::*;
 
 #[cfg(target_os = "linux")]
 pub(super) use dbus::*;
@@ -76,12 +76,15 @@ mod dbus {
     impl Daemon for DbusDaemon {
         #[instrument(skip(self))]
         async fn upgrade(&self) -> usize {
-            1
+            let client = &self.relay_client;
+            client.upgrade_conn().await.unwrap();
+            0
         }
 
         #[instrument(skip(self))]
         async fn login(&mut self, username: &str) -> usize {
             let client = &self.relay_client;
+
             let login_cfg = match client.login(username).await {
                 Ok(value) => value,
                 Err(error) => {
@@ -90,7 +93,7 @@ mod dbus {
                 }
             };
 
-            self.login_cfg = Some(login_cfg);
+            self.login_cfg = Some((login_cfg.address, login_cfg.netmask));
 
             0
         }

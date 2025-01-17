@@ -1,11 +1,13 @@
-use std::{
-    net::{Ipv4Addr, SocketAddr},
-    time::Duration,
-};
+use std::{net::SocketAddr, time::Duration};
 
 use s2n_quic::{client::Connect, Client as QuicClient};
 
-use crate::{action::Action, error::*, wire, CERT};
+pub use crate::action::ServerApi;
+use crate::{
+    action::{response::*, Action},
+    error::*,
+    wire, CERT,
+};
 
 #[derive(Debug)]
 pub struct Client {
@@ -32,9 +34,11 @@ impl Client {
             timeout,
         })
     }
+}
 
+impl ServerApi for Client {
     #[instrument(skip(self))]
-    pub async fn login(&self, username: &str) -> Result<(Ipv4Addr, Ipv4Addr)> {
+    async fn login(&self, username: &str) -> Result<LoginResp> {
         debug!("trying to log in user");
 
         let connect = Connect::new(self.server_addr).with_server_name("localhost");
@@ -76,12 +80,17 @@ impl Client {
         };
 
         trace!("waiting for a response");
-        let res: (_, _) = wire::deserialise_stream(&mut recv_stream).await?;
+        let res: LoginResp = wire::deserialise_stream(&mut recv_stream).await?;
         debug!(
             "server assigned ip: {}, mask: {} for {}",
-            res.0, res.1, username
+            res.address, res.netmask, username
         );
 
         Ok(res)
+    }
+
+    #[instrument(skip(self))]
+    async fn upgrade_conn(&self) -> Result<()> {
+        todo!()
     }
 }
