@@ -22,3 +22,6 @@ thiserror.workspace = true
 
 #sqlite.workspace = true
 rusqlite.workspace = true
+
+[dev-dependencies]
+rstest = "0.24.0"
