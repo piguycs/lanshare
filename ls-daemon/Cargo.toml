@@ -15,6 +15,7 @@ serde.workspace = true
 thiserror.workspace = true
 
 relay-server.workspace = true
+errors.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 tun.workspace = true

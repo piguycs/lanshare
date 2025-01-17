@@ -1,5 +1,5 @@
 [workspace]
-members = ["ls-daemon", "ls-client", "relay-server"]
+members = ["ls-daemon", "ls-client", "relay-server", "errors"]
 resolver = "2"
 
 [workspace.package]
@@ -29,11 +29,14 @@ thiserror = { version = "2.0.9" }
 #sqlite = { version = "0.36.1" }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 
-relay-server = { path = "relay-server" }
-
 # [target.'cfg(target_os = "linux")'.dependencies]
 tun = { version = "0.7.10" }
 zbus = { version = "5.2.0" }
 
 # test deps
 rstest = { version = "0.24.0" }
+
+# packages in THIS workspace
+errors = { path = "errors" }
+relay-server = { path = "relay-server" }
+

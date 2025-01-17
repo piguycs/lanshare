@@ -2,6 +2,7 @@ use std::net::Ipv4Addr;
 
 use tokio::sync::mpsc;
 
+use errors::*;
 use relay_server::client::Client;
 
 #[cfg(target_os = "linux")]
@@ -29,7 +30,7 @@ pub trait Daemon {
     async fn send_event(tx: &mpsc::Sender<DaemonEvent>, event: DaemonEvent) -> usize {
         if let Err(error) = tx.send(event).await {
             error!("{error}");
-            return 1;
+            return DAEMON_ERROR;
         }
 
         trace!("command to set the device state to {event:?} has been sent");
@@ -78,7 +79,7 @@ mod dbus {
                 Ok(value) => value,
                 Err(error) => {
                     error!("could not login user: {error}");
-                    return 1;
+                    return LOGIN_INVALID;
                 }
             };
 
@@ -92,7 +93,7 @@ mod dbus {
             if let Some((address, netmask)) = self.login_cfg {
                 Self::send_event(&self.tx, DaemonEvent::Up { address, netmask }).await
             } else {
-                1
+                CLOSED_CHANNEL
             }
         }
 
