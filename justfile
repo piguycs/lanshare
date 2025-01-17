@@ -15,6 +15,9 @@ set dotenv-load := true
 @test:
     cargo nextest run
 
+@coverage:
+    cargo llvm-cov nextest
+
 # ehhh, I should prolly impliment Drop and handle these there
 #clean-socks:
 #    ls $XDG_RUNTIME_DIR/lanshare-*
