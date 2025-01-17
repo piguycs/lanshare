@@ -34,3 +34,6 @@ relay-server = { path = "relay-server" }
 # [target.'cfg(target_os = "linux")'.dependencies]
 tun = { version = "0.7.10" }
 zbus = { version = "5.2.0" }
+
+# test deps
+rstest = { version = "0.24.0" }
