@@ -4,7 +4,6 @@ use std::{
 };
 
 use s2n_quic::{client::Connect, Client as QuicClient};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{action::Action, error::*, wire, CERT, PUBLIC_SOCKET_ADDR};
 
@@ -55,17 +54,13 @@ impl Client {
             .map_err(QuicError::from)?;
 
         trace!("trying to serialize data");
-        let data = wire::serialise(&Action::Login {
-            name: username.to_string(),
-        })?;
-
-        trace!("trying to send all data");
-        send_stream
-            .write_all(&data)
-            .await
-            .map_err(QuicError::from)?;
-        trace!("sent login info to server");
-
+        wire::serialise_stream(
+            &mut send_stream,
+            &Action::Login {
+                name: username.to_string(),
+            },
+        )
+        .await?;
         drop(send_stream);
 
         let recv_stream = connection
@@ -82,9 +77,7 @@ impl Client {
         };
 
         trace!("waiting for a response");
-        let mut buf = vec![];
-        let _len = recv_stream.read_buf(&mut buf).await.unwrap();
-        let res: (_, _) = wire::deserialise(&buf)?;
+        let res: (_, _) = wire::deserialise_stream(&mut recv_stream).await?;
         debug!("server assigned ip: {}, mask: {}", res.0, res.1);
 
         Ok(res)

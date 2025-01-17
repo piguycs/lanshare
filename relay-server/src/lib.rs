@@ -8,7 +8,6 @@ pub mod error;
 mod wire;
 
 use s2n_quic::{Connection, Server as QuicServer};
-use tokio::io::AsyncReadExt;
 
 use crate::{action::Action, error::*};
 
@@ -68,16 +67,10 @@ async fn handle_connection(mut connection: Connection, db: db::Db) {
         Err(error) => return error!("{error}"),
     };
 
-    // TODO: BAD because blocking IO
-    let mut buf = vec![];
-    let _len = match recv_stream.read_buf(&mut buf).await {
-        Ok(value) => value,
-        Err(error) => return error!("{error}"),
-    };
-
-    let action = wire::deserialise(&buf);
-    debug!(?buf);
+    let action = wire::deserialise_stream(&mut recv_stream).await;
     drop(recv_stream);
+
+    info!("bagged a baddie, {:?}", action);
 
     let action: Action = match action {
         Ok(value) => value,

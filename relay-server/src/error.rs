@@ -14,6 +14,8 @@ pub enum Error {
     BincodeError(#[from] bincode::Error),
     #[error("data had insufficient len bytes")]
     InsufficientLenBytes,
+    #[error("wire error: {}", 0)]
+    WireError(io::Error),
     #[error("server closed the connection prematurely")]
     PrematureClosure,
 }
