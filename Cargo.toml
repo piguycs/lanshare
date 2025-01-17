@@ -30,7 +30,7 @@ thiserror = { version = "2.0.9" }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 
 # [target.'cfg(target_os = "linux")'.dependencies]
-tun = { version = "0.7.10" }
+tun = { version = "0.7.10", features = ["async"] }
 zbus = { version = "5.2.0" }
 
 # test deps

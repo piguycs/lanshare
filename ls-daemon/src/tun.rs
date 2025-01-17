@@ -1,7 +1,4 @@
-use tokio::sync::{
-    broadcast::{self, error::SendError},
-    mpsc,
-};
+use tokio::sync::mpsc::{self, error::SendError};
 use tun::Configuration as TunConfig;
 
 use crate::{daemon::DaemonEvent, error};
@@ -32,7 +29,7 @@ impl TunController {
     pub async fn listen(
         &mut self,
         mut rx: mpsc::Receiver<DaemonEvent>,
-        mut tun_tx: broadcast::Sender<TunEvent>,
+        mut tun_tx: mpsc::Sender<TunEvent>,
     ) -> error::Result<()> {
         loop {
             if let Some(event) = rx.recv().await {
@@ -45,16 +42,16 @@ impl TunController {
     }
 
     #[instrument(skip(self, tun_tx))]
-    async fn handle_event(&mut self, event: DaemonEvent, tun_tx: &mut broadcast::Sender<TunEvent>) {
+    async fn handle_event(&mut self, event: DaemonEvent, tun_tx: &mut mpsc::Sender<TunEvent>) {
         trace!("TunController recieved event");
         match event {
             DaemonEvent::Up { address, netmask } => {
                 let mut config = self.config.clone();
                 config.address(address).netmask(netmask);
-                handle_send_res(tun_tx.send(TunEvent::Up(config)));
+                handle_send_res(tun_tx.send(TunEvent::Up(config)).await);
             }
             DaemonEvent::Down => {
-                handle_send_res(tun_tx.send(TunEvent::Down));
+                handle_send_res(tun_tx.send(TunEvent::Down).await);
             }
         }
 
@@ -62,7 +59,7 @@ impl TunController {
     }
 }
 
-fn handle_send_res<T: std::fmt::Debug>(res: Result<usize, SendError<T>>) {
+fn handle_send_res<T: std::fmt::Debug>(res: Result<(), SendError<T>>) {
     if let Err(error) = res {
         error!("no active recievers to recieve {:?}", error.0);
     }

@@ -6,10 +6,10 @@ extern crate tracing;
 mod daemon;
 mod error;
 mod tun;
-
-use std::io::Read;
-
-use tokio::sync::{broadcast, mpsc};
+use tokio::{
+    io::AsyncReadExt,
+    sync::mpsc::{self, error::TryRecvError},
+};
 use tun::TunEvent;
 use zbus::connection;
 
@@ -26,12 +26,14 @@ async fn main() -> error::Result {
     // channel for recieving events from dbus
     let (tx, rx) = mpsc::channel::<DaemonEvent>(1);
     // channel for recieving tun device from TunController
-    let (tun_tx, tun_rx1) = broadcast::channel::<TunEvent>(1);
-    let tun_rx2 = tun_tx.subscribe();
+    let (tun_tx, tun_rx1) = mpsc::channel::<TunEvent>(1);
 
     // NOTE: the code will simply do nothing if not on linux.
     // - The main blocker is that I dont know how my code will be architected for them.
     //   I might need to move the relay connectors to a lib, and make multiple bins.
+    // - Dbus is supported outside linux, but I would prefer to use platform-specific APIs
+    //   - COM (or whatever) for Windows
+    //   - XPC for SoyOS
     #[cfg(target_os = "linux")]
     let _conn = {
         let daemon = DbusDaemon::try_new(tx).await?;
@@ -49,55 +51,48 @@ async fn main() -> error::Result {
 
     #[cfg(not(target_os = "linux"))]
     {
-        error!("this platform is not supported, the daemon will do nothing");
+        error!("this platform is not supported (yet), the daemon will do nothing");
     }
 
-    // HACK: the ip and netmask needs to be set by the relay after login
     let mut tc = TunController::new();
 
     let res = tokio::select! {
         res = tc.listen(rx, tun_tx) => res,
-        _ = device_task(tun_rx1, tun_rx2) => Ok(()),
+        _ = device_task(tun_rx1) => Ok(()),
     };
 
     if let Err(error) = &res {
-        error!("{error}");
+        error!(?error, "{error}");
         res?;
     }
 
     Ok(())
 }
 
-#[instrument(skip(rx1, rx2))]
-async fn device_task(
-    mut rx1: broadcast::Receiver<TunEvent>,
-    mut rx2: broadcast::Receiver<TunEvent>,
-) {
+#[instrument(skip(rx))]
+async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
     loop {
-        if let Ok(TunEvent::Up(config)) = rx1.recv().await {
-            let mut device = match ::tun::create(&config) {
-                Ok(value) => value,
-                Err(error) => {
-                    error!("{error}");
-                    continue;
-                }
-            };
-            let mut buf = [0; 1024];
+        let config = match rx.recv().await {
+            Some(TunEvent::Up(config)) => config,
+            Some(TunEvent::Down) => {
+                warn!("TUN interface is already down");
+                continue;
+            }
+            None => return error!("channel closed"),
+        };
 
-            loop {
-                let amount = match device.read(&mut buf) {
-                    Ok(value) => value,
-                    Err(error) => {
-                        error!("{error}");
-                        continue;
-                    }
-                };
-                trace!("read {amount} bytes");
+        let mut device = ::tun::create_as_async(&config).unwrap();
 
-                if let Ok(TunEvent::Down) = rx2.recv().await {
-                    debug!("recieved tun down event");
-                    break;
-                }
+        let mut buf = [0; 4096];
+        loop {
+            let amount = device.read(&mut buf).await.unwrap();
+            info!("read {amount} bytes");
+
+            match rx.try_recv() {
+                Ok(TunEvent::Down) => break,
+                Ok(TunEvent::Up(_)) => warn!("TUN interface is already up"),
+                Err(TryRecvError::Empty) => (), // happy case
+                Err(error) => error!(?error, "(probably) nonfatal error: {error}"),
             }
         }
     }
