@@ -69,15 +69,11 @@ async fn handle_connection(mut connection: Connection, db: db::Db) {
     let action = wire::deserialise_stream(&mut recv_stream).await;
     drop(recv_stream);
 
-    info!("bagged a baddie, {:?}", action);
-
     let action: Action = match action {
         Ok(value) => value,
         // void return, acts as an early exit
         Err(error) => return error!(?error, "{error}"),
     };
-
-    info!("reading action boobs");
 
     action.handle(connection, db).await;
 
