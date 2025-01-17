@@ -12,6 +12,8 @@ pub enum Error {
     SchemaError(rusqlite::Error),
     #[error("bincode error: {}", 0)]
     BincodeError(#[from] bincode::Error),
+    #[error("data had insufficient len bytes")]
+    InsufficientLenBytes,
     #[error("server closed the connection prematurely")]
     PrematureClosure,
 }

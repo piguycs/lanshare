@@ -5,12 +5,10 @@ mod action;
 pub mod client;
 mod db;
 pub mod error;
+mod wire;
 
-use std::{net::Ipv4Addr, sync::LazyLock};
-
-use bincode::Options;
 use s2n_quic::{Connection, Server as QuicServer};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncReadExt;
 
 use crate::{action::Action, error::*};
 
@@ -19,13 +17,6 @@ const PUBLIC_SOCKET_ADDR: &str = "127.0.0.1:4433";
 
 static CERT: &str = include_str!("../../certs/cert.pem");
 static KEY: &str = include_str!("../../certs/key.pem");
-
-const BINCODE_BYTE_LIMIT: u64 = 16 * 1024;
-type BincodeConfig =
-    bincode::config::WithOtherLimit<bincode::DefaultOptions, bincode::config::Bounded>;
-
-pub static BINCODE: LazyLock<BincodeConfig> =
-    LazyLock::new(|| bincode::DefaultOptions::new().with_limit(BINCODE_BYTE_LIMIT));
 
 pub struct Server {
     db: db::Db,
@@ -79,8 +70,12 @@ async fn handle_connection(mut connection: Connection, db: db::Db) {
 
     // TODO: BAD because blocking IO
     let mut buf = vec![];
-    let _len = recv_stream.read_buf(&mut buf).await.unwrap();
-    let action = BINCODE.deserialize(&buf);
+    let _len = match recv_stream.read_buf(&mut buf).await {
+        Ok(value) => value,
+        Err(error) => return error!("{error}"),
+    };
+
+    let action = wire::deserialise(&buf);
     debug!(?buf);
     drop(recv_stream);
 

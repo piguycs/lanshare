@@ -3,11 +3,10 @@ use std::{
     time::Duration,
 };
 
-use bincode::Options;
 use s2n_quic::{client::Connect, Client as QuicClient};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::{action::Action, error::*, BINCODE, CERT, PUBLIC_SOCKET_ADDR};
+use crate::{action::Action, error::*, wire, CERT, PUBLIC_SOCKET_ADDR};
 
 #[derive(Debug)]
 pub struct Client {
@@ -56,7 +55,7 @@ impl Client {
             .map_err(QuicError::from)?;
 
         trace!("trying to serialize data");
-        let data = BINCODE.serialize(&Action::Login {
+        let data = wire::serialise(&Action::Login {
             name: username.to_string(),
         })?;
 
@@ -85,7 +84,7 @@ impl Client {
         trace!("waiting for a response");
         let mut buf = vec![];
         let _len = recv_stream.read_buf(&mut buf).await.unwrap();
-        let res: (_, _) = BINCODE.deserialize(&buf).unwrap();
+        let res: (_, _) = wire::deserialise(&buf)?;
         debug!("server assigned ip: {}, mask: {}", res.0, res.1);
 
         Ok(res)
