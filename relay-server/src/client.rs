@@ -34,6 +34,8 @@ impl Client {
     #[instrument(skip(self))]
     pub async fn login(&self, username: &str) -> Result<(Ipv4Addr, Ipv4Addr)> {
         debug!("trying to log in user");
+
+        // unwrap here is fine, we know that this is almost infailable
         let addr: SocketAddr = PUBLIC_SOCKET_ADDR.parse().unwrap_or_else(|error| {
             error!("{error}");
             panic!("server's address {} is not valid", PUBLIC_SOCKET_ADDR);

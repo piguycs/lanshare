@@ -32,6 +32,8 @@ pub trait Daemon {
 mod dbus {
     use zbus::interface;
 
+    use crate::error::Result;
+
     use super::*;
 
     #[derive(Debug)]
@@ -41,10 +43,9 @@ mod dbus {
     }
 
     impl DbusDaemon {
-        pub async fn new(tx: mpsc::Sender<DaemonEvent>) -> Self {
-            // TODO: remove unwrap
-            let relay_client = Client::try_new().await.unwrap();
-            Self { tx, relay_client }
+        pub async fn try_new(tx: mpsc::Sender<DaemonEvent>) -> Result<Self> {
+            let relay_client = Client::try_new().await?;
+            Ok(Self { tx, relay_client })
         }
     }
 

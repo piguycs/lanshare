@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 use s2n_quic::Connection;
 use serde::{Deserialize, Serialize};
 
-use crate::{db::Db, wire};
+use crate::{db::Db, error::*, wire};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Action {
@@ -15,7 +15,12 @@ impl Action {
         match self {
             Action::Login { name } => {
                 info!(?name);
-                let mut send_stream = connection.open_send_stream().await.unwrap();
+                let res = connection.open_send_stream().await.map_err(QuicError::from);
+
+                let mut send_stream = match res {
+                    Ok(value) => value,
+                    Err(error) => return error!("could not open send stream: {error}"),
+                };
 
                 let data = wire::serialise_stream(
                     &mut send_stream,

@@ -19,7 +19,7 @@ use crate::{
 };
 
 #[tokio::main]
-async fn main() -> error::Result<()> {
+async fn main() -> error::Result {
     tracing_subscriber::fmt::init();
     info!("hello from daemon");
 
@@ -34,7 +34,7 @@ async fn main() -> error::Result<()> {
     //   I might need to move the relay connectors to a lib, and make multiple bins.
     #[cfg(target_os = "linux")]
     let _conn = {
-        let daemon = DbusDaemon::new(tx).await;
+        let daemon = DbusDaemon::try_new(tx).await?;
 
         let conn = connection::Builder::system()?
             .name("me.piguy.lanshare.daemon")?
