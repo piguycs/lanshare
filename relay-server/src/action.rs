@@ -1,5 +1,3 @@
-use std::net::Ipv4Addr;
-
 use s2n_quic::Connection;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +9,7 @@ pub enum Action {
 }
 
 impl Action {
-    pub async fn handle(&self, mut connection: Connection, _db: Db) {
+    pub async fn handle(&self, mut connection: Connection, db: Db) {
         match self {
             Action::Login { name } => {
                 info!(?name);
@@ -22,11 +20,13 @@ impl Action {
                     Err(error) => return error!("could not open send stream: {error}"),
                 };
 
-                let data = wire::serialise_stream(
-                    &mut send_stream,
-                    &(Ipv4Addr::new(0, 0, 0, 0), (Ipv4Addr::new(0, 0, 0, 0))),
-                )
-                .await;
+                let (address, netmask) = match db.new_user_ip(name).await {
+                    Ok(value) => value,
+                    Err(error) => return error!(?error, "could not acquire address: {error}"),
+                };
+                info!("user {name} has been assigned address {address} and netmask {netmask}");
+
+                let data = wire::serialise_stream(&mut send_stream, &(address, netmask)).await;
 
                 if let Err(error) = data {
                     error!("{error}");

@@ -1,3 +1,5 @@
+use std::net::Ipv4Addr;
+
 use tokio::sync::mpsc;
 
 use relay_server::client::Client;
@@ -5,14 +7,21 @@ use relay_server::client::Client;
 #[cfg(target_os = "linux")]
 pub(super) use dbus::*;
 
+pub const SERVER_ADDR: &str = "127.0.0.1:4433";
+
 #[derive(Debug, Clone, Copy)]
 pub enum DaemonEvent {
-    Up,
+    Up {
+        address: Ipv4Addr,
+        netmask: Ipv4Addr,
+    },
     Down,
 }
 
 pub trait Daemon {
-    async fn login(&self, username: &str) -> usize;
+    // this function is expected to modify the login state
+    async fn login(&mut self, username: &str) -> usize;
+
     async fn int_up(&self) -> usize;
     async fn int_down(&self) -> usize;
 
@@ -30,6 +39,11 @@ pub trait Daemon {
 
 #[cfg(target_os = "linux")]
 mod dbus {
+    use std::{
+        net::{Ipv4Addr, SocketAddr},
+        str::FromStr,
+    };
+
     use zbus::interface;
 
     use crate::error::Result;
@@ -40,31 +54,46 @@ mod dbus {
     pub struct DbusDaemon {
         tx: mpsc::Sender<DaemonEvent>,
         relay_client: Client,
+        login_cfg: Option<(Ipv4Addr, Ipv4Addr)>,
     }
 
     impl DbusDaemon {
         pub async fn try_new(tx: mpsc::Sender<DaemonEvent>) -> Result<Self> {
-            let relay_client = Client::try_new().await?;
-            Ok(Self { tx, relay_client })
+            let server_addr = SocketAddr::from_str(SERVER_ADDR).expect("infailable");
+            let relay_client = Client::try_new(server_addr).await?;
+            Ok(Self {
+                tx,
+                relay_client,
+                login_cfg: None,
+            })
         }
     }
 
     #[interface(name = "me.piguy.lanshare.daemon1")]
     impl Daemon for DbusDaemon {
         #[instrument(skip(self))]
-        async fn login(&self, username: &str) -> usize {
+        async fn login(&mut self, username: &str) -> usize {
             let client = &self.relay_client;
-            if let Err(error) = client.login(username).await {
-                error!("could not login user: {error}");
-                return 1;
-            }
+            let login_cfg = match client.login(username).await {
+                Ok(value) => value,
+                Err(error) => {
+                    error!("could not login user: {error}");
+                    return 1;
+                }
+            };
+
+            self.login_cfg = Some(login_cfg);
 
             0
         }
 
         #[instrument(skip(self))]
         async fn int_up(&self) -> usize {
-            Self::send_event(&self.tx, DaemonEvent::Up).await
+            if let Some((address, netmask)) = self.login_cfg {
+                Self::send_event(&self.tx, DaemonEvent::Up { address, netmask }).await
+            } else {
+                1
+            }
         }
 
         #[instrument(skip(self))]

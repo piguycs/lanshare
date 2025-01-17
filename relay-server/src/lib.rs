@@ -12,7 +12,6 @@ use s2n_quic::{Connection, Server as QuicServer};
 use crate::{action::Action, error::*};
 
 const SOCKET_ADDR: &str = "0.0.0.0:4433";
-const PUBLIC_SOCKET_ADDR: &str = "127.0.0.1:4433";
 
 static CERT: &str = include_str!("../../certs/cert.pem");
 static KEY: &str = include_str!("../../certs/key.pem");

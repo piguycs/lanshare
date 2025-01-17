@@ -2,7 +2,7 @@ use tokio::sync::{
     broadcast::{self, error::SendError},
     mpsc,
 };
-use tun::{Configuration as TunConfig, ToAddress};
+use tun::Configuration as TunConfig;
 
 use crate::{daemon::DaemonEvent, error};
 
@@ -20,15 +20,10 @@ pub struct TunController {
 }
 
 impl TunController {
-    pub fn new<T: ToAddress>(address: T, netmask: T) -> Self {
+    pub fn new() -> Self {
         let mut config = TunConfig::default();
 
-        config
-            .tun_name("lanshare0")
-            .address(address)
-            .netmask(netmask)
-            .mtu(DEFAULT_MTU)
-            .up();
+        config.tun_name("lanshare0").mtu(DEFAULT_MTU).up();
 
         TunController { config }
     }
@@ -53,8 +48,9 @@ impl TunController {
     async fn handle_event(&mut self, event: DaemonEvent, tun_tx: &mut broadcast::Sender<TunEvent>) {
         trace!("TunController recieved event");
         match event {
-            DaemonEvent::Up => {
-                let config = self.config.clone();
+            DaemonEvent::Up { address, netmask } => {
+                let mut config = self.config.clone();
+                config.address(address).netmask(netmask);
                 handle_send_res(tun_tx.send(TunEvent::Up(config)));
             }
             DaemonEvent::Down => {

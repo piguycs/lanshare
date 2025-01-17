@@ -53,7 +53,7 @@ async fn main() -> error::Result {
     }
 
     // HACK: the ip and netmask needs to be set by the relay after login
-    let mut tc = TunController::new("25.0.0.2", "255.0.0.0");
+    let mut tc = TunController::new();
 
     let res = tokio::select! {
         res = tc.listen(rx, tun_tx) => res,
