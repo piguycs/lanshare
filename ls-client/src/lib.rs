@@ -9,4 +9,5 @@ pub trait Daemon {
     async fn login(&self, username: &str) -> Result<u64>;
     async fn int_up(&self) -> Result<u64>;
     async fn int_down(&self) -> Result<u64>;
+    async fn upgrade(&self) -> Result<u64>;
 }

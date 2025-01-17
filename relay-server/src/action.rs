@@ -5,12 +5,14 @@ use crate::{db::Db, error::*, wire};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Action {
+    UpgradeConn,
     Login { name: String },
 }
 
 impl Action {
     pub async fn handle(&self, mut connection: Connection, db: Db) {
         match self {
+            Action::UpgradeConn => todo!(),
             Action::Login { name } => {
                 info!(?name);
                 let res = connection.open_send_stream().await.map_err(QuicError::from);

@@ -26,6 +26,8 @@ pub trait Daemon {
     async fn int_up(&self) -> usize;
     async fn int_down(&self) -> usize;
 
+    async fn upgrade(&self) -> usize;
+
     #[instrument(skip(tx))]
     async fn send_event(tx: &mpsc::Sender<DaemonEvent>, event: DaemonEvent) -> usize {
         if let Err(error) = tx.send(event).await {
@@ -72,6 +74,11 @@ mod dbus {
 
     #[interface(name = "me.piguy.lanshare.daemon1")]
     impl Daemon for DbusDaemon {
+        #[instrument(skip(self))]
+        async fn upgrade(&self) -> usize {
+            1
+        }
+
         #[instrument(skip(self))]
         async fn login(&mut self, username: &str) -> usize {
             let client = &self.relay_client;
