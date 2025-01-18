@@ -54,10 +54,17 @@ mod dbus {
     use super::*;
 
     #[derive(Debug)]
+    pub struct LoginCfg {
+        address: Ipv4Addr,
+        netmask: Ipv4Addr,
+        token: String,
+    }
+
+    #[derive(Debug)]
     pub struct DbusDaemon {
         tx: mpsc::Sender<DaemonEvent>,
         relay_client: Client,
-        login_cfg: Option<(Ipv4Addr, Ipv4Addr)>,
+        login_cfg: Option<LoginCfg>,
     }
 
     impl DbusDaemon {
@@ -76,8 +83,13 @@ mod dbus {
     impl Daemon for DbusDaemon {
         #[instrument(skip(self))]
         async fn upgrade(&self) -> usize {
-            let client = &self.relay_client;
-            client.upgrade_conn().await.unwrap();
+            if let Some(LoginCfg { token, .. }) = &self.login_cfg {
+                let client = &self.relay_client;
+                client.upgrade_conn(token).await.unwrap();
+            } else {
+                return 1;
+            }
+
             0
         }
 
@@ -93,14 +105,23 @@ mod dbus {
                 }
             };
 
-            self.login_cfg = Some((login_cfg.address, login_cfg.netmask));
+            self.login_cfg = Some(LoginCfg {
+                address: login_cfg.address,
+                netmask: login_cfg.netmask,
+                token: login_cfg.token,
+            });
 
             0
         }
 
         #[instrument(skip(self))]
         async fn int_up(&self) -> usize {
-            if let Some((address, netmask)) = self.login_cfg {
+            if let Some(LoginCfg {
+                address, netmask, ..
+            }) = &self.login_cfg
+            {
+                let address = *address;
+                let netmask = *netmask;
                 Self::send_event(&self.tx, DaemonEvent::Up { address, netmask }).await
             } else {
                 CLOSED_CHANNEL

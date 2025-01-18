@@ -12,6 +12,8 @@ pub enum Error {
     SchemaError(rusqlite::Error),
     #[error("sql error: {}", 0)]
     SqlError(rusqlite::Error),
+    #[error("user already exists")]
+    UserAlreadyExists,
     #[error("bincode error: {}", 0)]
     BincodeError(#[from] bincode::Error),
     #[error("data had insufficient len bytes")]

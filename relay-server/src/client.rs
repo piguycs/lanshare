@@ -1,6 +1,7 @@
 use std::{net::SocketAddr, time::Duration};
 
-use s2n_quic::{client::Connect, Client as QuicClient};
+use s2n_quic::{client::Connect, Client as QuicClient, Connection};
+use serde::de::DeserializeOwned;
 
 pub use crate::action::ServerApi;
 use crate::{
@@ -34,22 +35,23 @@ impl Client {
             timeout,
         })
     }
-}
 
-impl ServerApi for Client {
     #[instrument(skip(self))]
-    async fn login(&self, username: &str) -> Result<LoginResp> {
-        debug!("trying to log in user");
-
+    async fn get_connection(&self) -> Result<Connection> {
         let connect = Connect::new(self.server_addr).with_server_name("localhost");
 
         trace!("trying to connect to the server");
-        let mut connection = self
+        let connection = self
             .quic_client
             .connect(connect)
             .await
             .map_err(QuicError::from)?;
 
+        Ok(connection)
+    }
+
+    #[instrument(skip(self, connection))]
+    async fn send_action(&self, connection: &mut Connection, action: Action) -> Result<()> {
         trace!("trying to open an uni-directional stream");
         let mut send_stream = connection
             .open_send_stream()
@@ -57,15 +59,13 @@ impl ServerApi for Client {
             .map_err(QuicError::from)?;
 
         trace!("trying to serialize data");
-        wire::serialise_stream(
-            &mut send_stream,
-            &Action::Login {
-                name: username.to_string(),
-            },
-        )
-        .await?;
-        drop(send_stream);
+        wire::serialise_stream(&mut send_stream, &action).await?;
 
+        Ok(())
+    }
+
+    #[instrument(skip(self, connection))]
+    async fn receive_data<T: DeserializeOwned>(&self, connection: &mut Connection) -> Result<T> {
         let recv_stream = connection
             .accept_receive_stream()
             .await
@@ -80,7 +80,35 @@ impl ServerApi for Client {
         };
 
         trace!("waiting for a response");
-        let res: LoginResp = wire::deserialise_stream(&mut recv_stream).await?;
+        let res = wire::deserialise_stream(&mut recv_stream).await?;
+
+        Ok(res)
+    }
+
+    async fn send_and_recv<T: DeserializeOwned>(
+        &self,
+        connection: &mut Connection,
+        action: Action,
+    ) -> Result<T> {
+        self.send_action(connection, action).await?;
+        let res = self.receive_data(connection).await?;
+        Ok(res)
+    }
+}
+
+impl ServerApi for Client {
+    #[instrument(skip(self))]
+    async fn login(&self, username: &str) -> Result<LoginResp> {
+        trace!("trying to log in user");
+
+        let mut connection = self.get_connection().await?;
+
+        let action = Action::Login {
+            name: username.to_string(),
+        };
+
+        let res: LoginResp = self.send_and_recv(&mut connection, action).await?;
+
         debug!(
             "server assigned ip: {}, mask: {} for {}",
             res.address, res.netmask, username
@@ -90,7 +118,10 @@ impl ServerApi for Client {
     }
 
     #[instrument(skip(self))]
-    async fn upgrade_conn(&self) -> Result<()> {
-        todo!()
+    async fn upgrade_conn(&self, token: &str) -> Result<()> {
+        warn!(
+            "upgrade client not implimented, but returning Ok to prevent crash during my 'testing'"
+        );
+        Ok(())
     }
 }

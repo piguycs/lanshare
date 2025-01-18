@@ -45,7 +45,7 @@ impl Action {
 #[trait_variant::make(Send)]
 pub trait ServerApi {
     async fn login(&self, username: &str) -> Result<LoginResp>;
-    async fn upgrade_conn(&self) -> Result<()>;
+    async fn upgrade_conn(&self, token: &str) -> Result<()>;
 }
 
 pub mod response {
@@ -55,6 +55,7 @@ pub mod response {
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct LoginResp {
+        pub token: String,
         pub address: Ipv4Addr,
         pub netmask: Ipv4Addr,
     }
