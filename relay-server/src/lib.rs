@@ -7,6 +7,7 @@ mod db;
 pub mod error;
 mod wire;
 
+use action::handler::ServerHandler;
 use s2n_quic::{Connection, Server as QuicServer};
 
 use crate::{action::Action, error::*};
@@ -75,7 +76,7 @@ async fn handle_connection(mut connection: Connection, db: db::Db) {
         Err(error) => return error!(?error, "{error}"),
     };
 
-    action.handle(connection, db).await;
+    ServerHandler::handle_action(action, connection, db).await;
 
     info!("connection ended");
 }
