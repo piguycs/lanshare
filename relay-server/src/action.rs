@@ -2,7 +2,6 @@ use s2n_quic::Connection;
 use serde::{Deserialize, Serialize};
 
 use crate::{db::Db, error::*, wire};
-use handler::*;
 use response::*;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -11,15 +10,13 @@ pub enum Action {
     Login { name: String },
 }
 
-impl ServerHandler {
+impl Action {
     #[instrument(skip(connection, db), fields(remote_addr = ?connection.remote_addr()))]
-    pub async fn handle_action(action: Action, connection: Connection, db: Db) {
-        let handler = Self { db };
-
-        match action {
+    pub async fn handle_action(self, connection: Connection, db: Db) {
+        match self {
             Action::UpgradeConn => todo!(),
             Action::Login { name } => {
-                let data = match handler.login(&name).await {
+                let data = match db.login(&name).await {
                     Ok(value) => value,
                     Err(error) => return error!("{error}"),
                 };
@@ -31,10 +28,12 @@ impl ServerHandler {
         }
     }
 
+    #[instrument(skip(connection, data))]
     async fn send<T: Serialize>(mut connection: Connection, data: &T) -> Result<()> {
         let mut send_stream = connection
             .open_send_stream()
             .await
+            .inspect_err(|error| error!(?error, "error when opening send stream"))
             .map_err(QuicError::from)?;
 
         wire::serialise_stream(&mut send_stream, data).await?;
@@ -47,32 +46,6 @@ impl ServerHandler {
 pub trait ServerApi {
     async fn login(&self, username: &str) -> Result<LoginResp>;
     async fn upgrade_conn(&self) -> Result<()>;
-}
-
-pub mod handler {
-    use super::*;
-
-    pub struct ServerHandler {
-        pub(super) db: Db,
-    }
-
-    impl ServerApi for ServerHandler {
-        #[instrument(skip(self))]
-        async fn login(&self, username: &str) -> Result<LoginResp> {
-            let db = &self.db;
-            let (address, netmask) = db.new_user_ip(username).await?;
-            info!("user {username} has been assigned address {address} and netmask {netmask}");
-
-            let resp = LoginResp { address, netmask };
-
-            Ok(resp)
-        }
-
-        #[instrument(skip(self))]
-        async fn upgrade_conn(&self) -> Result<()> {
-            todo!()
-        }
-    }
 }
 
 pub mod response {
