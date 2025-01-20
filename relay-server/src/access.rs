@@ -42,7 +42,7 @@ impl ServerApi for Db {
 
     #[instrument(skip(self))]
     async fn upgrade_conn(&self, token: &str) -> Result<()> {
-        todo!()
+        Ok(())
     }
 }
 

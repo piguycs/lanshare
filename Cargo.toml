@@ -32,7 +32,7 @@ rusqlite = { version = "0.32.1", features = ["bundled"] }
 
 # [target.'cfg(target_os = "linux")'.dependencies]
 tun = { version = "0.7.10", features = ["async"] }
-zbus = { version = "5.2.0" }
+zbus = { version = "5.2.0", features = ["tokio"] }
 
 # test deps
 rstest = { version = "0.24.0" }
@@ -40,4 +40,3 @@ rstest = { version = "0.24.0" }
 # packages in THIS workspace
 errors = { path = "errors" }
 relay-server = { path = "relay-server" }
-

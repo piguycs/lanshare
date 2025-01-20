@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, time::Duration};
+use std::{fmt::write, net::SocketAddr, time::Duration};
 
 use s2n_quic::{client::Connect, Client as QuicClient, Connection};
 use serde::de::DeserializeOwned;
@@ -119,9 +119,36 @@ impl ServerApi for Client {
 
     #[instrument(skip(self))]
     async fn upgrade_conn(&self, token: &str) -> Result<()> {
-        warn!(
-            "upgrade client not implimented, but returning Ok to prevent crash during my 'testing'"
-        );
+        let mut connection = self.get_connection().await?;
+
+        info!("negotiating parameters for a bi-directional stream over an uni-directional channel");
+        self.send_action(&mut connection, Action::UpgradeConn)
+            .await?;
+        info!("one-way connection has been dropped upgrading to a bi-directional one");
+
+        let res = connection.accept_bidirectional_stream().await;
+
+        let bi = match res {
+            Ok(Some(value)) => value,
+            Ok(None) => todo!(),
+            Err(_error) => todo!(),
+        };
+        debug!(?bi);
+
+        if let Err(error) = connection.keep_alive(true) {
+            error!("Connection::keep_alive failed: {error}");
+        }
+
+        let (mut recv, mut send) = bi.split();
+
+        let handle = tokio::spawn(async {
+            for i in 0..10 {
+                println!("{i}");
+            }
+        });
+        println!("hello");
+        handle.await.unwrap();
+
         Ok(())
     }
 }
