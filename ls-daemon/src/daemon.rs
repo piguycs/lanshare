@@ -16,6 +16,8 @@ pub enum DaemonEvent {
         address: Ipv4Addr,
         netmask: Ipv4Addr,
     },
+    RemoteAdd,
+    RemoteDel,
     Down,
 }
 
@@ -85,7 +87,11 @@ mod dbus {
         async fn upgrade(&self) -> usize {
             if let Some(LoginCfg { token, .. }) = &self.login_cfg {
                 let client = &self.relay_client;
-                client.upgrade_conn(token).await.unwrap();
+                // TODO: send this to the tun controller
+                let bi = client.upgrade_conn(token).await.unwrap();
+                debug!(?bi);
+                Self::send_event(&self.tx, DaemonEvent::RemoteAdd).await;
+                Self::send_event(&self.tx, DaemonEvent::RemoteDel).await;
             } else {
                 return 1;
             }

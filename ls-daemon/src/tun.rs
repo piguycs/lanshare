@@ -45,6 +45,10 @@ impl TunController {
     async fn handle_event(&mut self, event: DaemonEvent, tun_tx: &mut mpsc::Sender<TunEvent>) {
         trace!("TunController recieved event");
         match event {
+            DaemonEvent::RemoteAdd | DaemonEvent::RemoteDel => {
+                // TODO: handle these events
+                warn!("SUP MAN");
+            }
             DaemonEvent::Up { address, netmask } => {
                 let mut config = self.config.clone();
                 config.address(address).netmask(netmask);

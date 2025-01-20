@@ -3,15 +3,11 @@ use std::net::Ipv4Addr;
 use rand::Rng as _;
 use rusqlite::{params, ErrorCode};
 
-use crate::{
-    action::{response::*, ServerApi},
-    db::Db,
-    error::*,
-};
+use crate::{action::response::*, db::Db, error::*};
 
-impl ServerApi for Db {
+impl Db {
     #[instrument(skip(self))]
-    async fn login(&self, username: &str) -> Result<LoginResp> {
+    pub async fn login(&self, username: &str) -> Result<LoginResp> {
         let ip_address = new_ip();
         let token = gen_token::<16>();
 
@@ -38,11 +34,6 @@ impl ServerApi for Db {
             address: ip_address.into(),
             netmask: Ipv4Addr::new(255, 0, 0, 0),
         })
-    }
-
-    #[instrument(skip(self))]
-    async fn upgrade_conn(&self, token: &str) -> Result<()> {
-        Ok(())
     }
 }
 

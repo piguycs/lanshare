@@ -1,37 +1,39 @@
-use s2n_quic::Connection;
-use serde::{Deserialize, Serialize};
+pub mod handler;
+pub mod response;
 
-use crate::{db::Db, error::*, wire};
+use s2n_quic::{stream::BidirectionalStream, Connection};
+use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
+
+use crate::{db::Db, error::*, wire, RoutingInfo};
+use handler::ServerHandler;
 use response::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Action {
-    UpgradeConn,
+    UpgradeConn { token: String },
     Login { name: String },
 }
 
 impl Action {
     #[instrument(skip(connection, db), fields(remote_addr = ?connection.remote_addr()))]
-    pub async fn handle_action(self, mut connection: Connection, db: Db) {
+    pub async fn handle_action(
+        self,
+        connection: Connection,
+        db: Db,
+        tx: mpsc::Sender<RoutingInfo>,
+    ) {
         match self {
-            Action::UpgradeConn => {
-                let bi = connection.open_bidirectional_stream().await.unwrap();
-                debug!(?bi);
+            Action::UpgradeConn { token } => {
+                let mut handler = ServerHandler { db, connection };
+                let bi = match handler.upgrade(&token).await {
+                    Ok(value) => value,
+                    Err(error) => return error!("{error}"),
+                };
 
-                if let Err(error) = connection.keep_alive(true) {
-                    error!("Connection::keep_alive failed: {error}");
+                if let Err(error) = tx.send(bi.split()).await {
+                    error!("could not send routing info: {error}");
                 }
-
-                let (mut recv, mut send) = bi.split();
-
-                tokio::spawn(async move {
-                    print!("[CLIENT] ");
-                    let mut stdout = tokio::io::stdout();
-                    let _ = tokio::io::copy(&mut recv, &mut stdout).await;
-                });
-
-                let mut stdin = tokio::io::stdin();
-                tokio::io::copy(&mut stdin, &mut send).await.unwrap();
             }
             Action::Login { name } => {
                 let data = match db.login(&name).await {
@@ -63,18 +65,5 @@ impl Action {
 #[trait_variant::make(Send)]
 pub trait ServerApi {
     async fn login(&self, username: &str) -> Result<LoginResp>;
-    async fn upgrade_conn(&self, token: &str) -> Result<()>;
-}
-
-pub mod response {
-    use super::*;
-
-    use std::net::Ipv4Addr;
-
-    #[derive(Debug, Serialize, Deserialize)]
-    pub struct LoginResp {
-        pub token: String,
-        pub address: Ipv4Addr,
-        pub netmask: Ipv4Addr,
-    }
+    async fn upgrade_conn(&self, token: &str) -> Result<BidirectionalStream>;
 }
