@@ -102,15 +102,11 @@ async fn handle_connection(mut connection: Connection, db: Db, tx: Sender<Routin
 
 #[instrument(skip(recv))]
 async fn parsepkt(mut recv: ReceiveStream) {
-    let mut buf = vec![0; 4096];
-    while let Ok(amount) = recv.read_buf(&mut buf).await {
-        if amount >= 20 {
-            match etherparse::Ipv4Slice::from_slice(&buf[..amount]) {
-                Ok(pktslice) => debug!(?pktslice),
-                Err(error) => error!(?error),
-            };
-        } else {
-            trace!("pkt not large enough");
+    let mut buf = [0; 4096];
+    while let Ok(amount) = recv.read(&mut buf).await {
+        match etherparse::Ipv4Slice::from_slice(&buf[..amount]) {
+            Ok(packet) => debug!(?packet, "ipv4 packet"),
+            Err(error) => error!(?error, "could not parse packet: {error}"),
         }
     }
 }

@@ -1,3 +1,5 @@
+use std::net::Ipv4Addr;
+
 use s2n_quic::stream::BidirectionalStream;
 use s2n_quic::Connection;
 
@@ -10,22 +12,18 @@ pub struct ServerHandler {
 }
 
 impl ServerHandler {
-    pub async fn upgrade(&mut self, token: &str) -> Result<BidirectionalStream> {
+    pub async fn upgrade(&mut self, token: &str) -> Result<(Ipv4Addr, BidirectionalStream)> {
         let db = self.db.db_conn.lock().await;
 
-        let name: String = db
-            .query_row(
-                "select username from users where token = ?1",
-                [token],
-                |e| {
-                    debug!(?e);
-                    e.get(0)
-                },
-            )
+        let ip_bits: u32 = db
+            .query_row("select ip from users where token = ?1", [token], |e| {
+                debug!(?e);
+                e.get(0)
+            })
             .inspect_err(|e| error!(?e))?;
         drop(db);
 
-        info!("upgrading connection for {name}");
+        let ip = Ipv4Addr::from_bits(ip_bits);
 
         let bi = self
             .connection
@@ -33,6 +31,6 @@ impl ServerHandler {
             .await
             .map_err(QuicError::from)?;
 
-        Ok(bi)
+        Ok((ip, bi))
     }
 }

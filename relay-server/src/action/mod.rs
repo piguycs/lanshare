@@ -1,13 +1,11 @@
 pub mod handler;
 pub mod response;
 
-use std::net::Ipv4Addr;
-
-use s2n_quic::{Connection, stream::BidirectionalStream};
+use s2n_quic::{stream::BidirectionalStream, Connection};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-use crate::{RoutingInfo, db::Db, error::*, wire};
+use crate::{db::Db, error::*, wire, RoutingInfo};
 use handler::ServerHandler;
 use response::*;
 
@@ -28,17 +26,13 @@ impl Action {
         match self {
             Action::UpgradeConn { token } => {
                 let mut handler = ServerHandler { db, connection };
-                let bi = match handler.upgrade(&token).await {
+                let (ip, bi) = match handler.upgrade(&token).await {
                     Ok(value) => value,
                     Err(error) => return error!("{error}"),
                 };
 
                 let (recv, send) = bi.split();
-                let ri = RoutingInfo {
-                    ip: Ipv4Addr::new(0, 0, 0, 0),
-                    send,
-                    recv,
-                };
+                let ri = RoutingInfo { ip, send, recv };
                 if let Err(error) = tx.send(ri).await {
                     error!("could not send routing info: {error}");
                 }

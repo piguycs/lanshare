@@ -110,8 +110,16 @@ async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
             if let Some(send) = send.clone() {
                 let mut send = send.lock().await;
                 let mut pkt = &buf[..amount];
-                if let Err(error) = send.write_buf(&mut pkt).await {
-                    error!(?error, "{error}");
+
+                debug!(?pkt, "maybe sending packet");
+                match send.write_buf(&mut pkt).await {
+                    Ok(sent_amount) if sent_amount != amount => {
+                        warn!(?sent_amount, ?amount, "packet of incorrect len sent")
+                    }
+                    Err(error) => {
+                        error!(?error, "{error}");
+                    }
+                    Ok(_) => (),
                 }
             }
 
