@@ -1,6 +1,7 @@
 use std::{net::SocketAddr, time::Duration};
 
-use s2n_quic::{client::Connect, stream::BidirectionalStream, Client as QuicClient, Connection};
+pub use s2n_quic::stream::BidirectionalStream;
+use s2n_quic::{client::Connect, Client as QuicClient, Connection};
 use serde::de::DeserializeOwned;
 
 pub use crate::action::ServerApi;

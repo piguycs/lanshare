@@ -10,15 +10,18 @@ pub(super) use dbus::*;
 
 pub const SERVER_ADDR: &str = "127.0.0.1:4433";
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub enum DaemonEvent {
     Up {
         address: Ipv4Addr,
         netmask: Ipv4Addr,
     },
-    RemoteAdd,
-    RemoteDel,
     Down,
+    RemoteAdd {
+        bi: BidirectionalStream,
+    },
+    #[allow(unused)]
+    RemoteDel,
 }
 
 pub trait Daemon {
@@ -37,7 +40,6 @@ pub trait Daemon {
             return DAEMON_ERROR;
         }
 
-        trace!("command to set the device state to {event:?} has been sent");
         0
     }
 }
@@ -90,8 +92,7 @@ mod dbus {
                 // TODO: send this to the tun controller
                 let bi = client.upgrade_conn(token).await.unwrap();
                 debug!(?bi);
-                Self::send_event(&self.tx, DaemonEvent::RemoteAdd).await;
-                Self::send_event(&self.tx, DaemonEvent::RemoteDel).await;
+                Self::send_event(&self.tx, DaemonEvent::RemoteAdd { bi }).await;
             } else {
                 return 1;
             }

@@ -1,11 +1,13 @@
 pub mod handler;
 pub mod response;
 
-use s2n_quic::{stream::BidirectionalStream, Connection};
+use std::net::Ipv4Addr;
+
+use s2n_quic::{Connection, stream::BidirectionalStream};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-use crate::{db::Db, error::*, wire, RoutingInfo};
+use crate::{RoutingInfo, db::Db, error::*, wire};
 use handler::ServerHandler;
 use response::*;
 
@@ -31,7 +33,13 @@ impl Action {
                     Err(error) => return error!("{error}"),
                 };
 
-                if let Err(error) = tx.send(bi.split()).await {
+                let (recv, send) = bi.split();
+                let ri = RoutingInfo {
+                    ip: Ipv4Addr::new(0, 0, 0, 0),
+                    send,
+                    recv,
+                };
+                if let Err(error) = tx.send(ri).await {
                     error!("could not send routing info: {error}");
                 }
             }

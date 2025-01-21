@@ -45,6 +45,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "arrayvec"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
+
+[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -460,6 +466,15 @@ dependencies = [
 [[package]]
 name = "errors"
 version = "0.1.0-dev"
+
+[[package]]
+name = "etherparse"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b14e4ac78394e3ea04edbbc412099cf54f2f52ded51efb79c466a282729399d2"
+dependencies = [
+ "arrayvec",
+]
 
 [[package]]
 name = "event-listener"
@@ -1195,6 +1210,7 @@ name = "relay-server"
 version = "0.1.0-dev"
 dependencies = [
  "bincode",
+ "etherparse",
  "rand 0.8.5",
  "rstest",
  "rusqlite",

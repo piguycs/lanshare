@@ -6,9 +6,14 @@ extern crate tracing;
 mod daemon;
 mod error;
 mod tun;
+use std::sync::Arc;
+
 use tokio::{
-    io::AsyncReadExt,
-    sync::mpsc::{self, error::TryRecvError},
+    io::{AsyncReadExt, AsyncWriteExt},
+    sync::{
+        mpsc::{self, error::TryRecvError},
+        Mutex,
+    },
 };
 use tun::TunEvent;
 use zbus::connection;
@@ -71,8 +76,22 @@ async fn main() -> error::Result {
 
 #[instrument(skip(rx))]
 async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
+    let mut send = None;
+    let mut recv = None;
+
     loop {
         let config = match rx.recv().await {
+            Some(TunEvent::SetRemote(Some(value))) => {
+                let (v_recv, v_send) = value.split();
+                send = Some(Arc::new(Mutex::new(v_send)));
+                recv = Some(v_recv);
+                continue;
+            }
+            Some(TunEvent::SetRemote(None)) => {
+                send = None;
+                recv = None;
+                continue;
+            }
             Some(TunEvent::Up(config)) => config,
             Some(TunEvent::Down) => {
                 warn!("TUN interface is already down");
@@ -82,13 +101,32 @@ async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
         };
 
         let mut device = ::tun::create_as_async(&config).unwrap();
+        let _ = recv; // TODO: read packets from the stream
 
         let mut buf = [0; 4096];
         loop {
             let amount = device.read(&mut buf).await.unwrap();
-            info!("read {amount} bytes");
+
+            if let Some(send) = send.clone() {
+                let mut send = send.lock().await;
+                let mut pkt = &buf[..amount];
+                if let Err(error) = send.write_buf(&mut pkt).await {
+                    error!(?error, "{error}");
+                }
+            }
 
             match rx.try_recv() {
+                Ok(TunEvent::SetRemote(Some(value))) => {
+                    let (v_recv, v_send) = value.split();
+                    send = Some(Arc::new(Mutex::new(v_send)));
+                    recv = Some(v_recv);
+                    continue;
+                }
+                Ok(TunEvent::SetRemote(None)) => {
+                    send = None;
+                    recv = None;
+                    continue;
+                }
                 Ok(TunEvent::Down) => break,
                 Ok(TunEvent::Up(_)) => warn!("TUN interface is already up"),
                 Err(TryRecvError::Empty) => (), // happy case

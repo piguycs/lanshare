@@ -11,12 +11,14 @@ pub mod error;
 mod wire;
 
 use std::collections::HashMap;
+use std::net::Ipv4Addr;
 
 use db::Db;
 use s2n_quic::stream::{ReceiveStream, SendStream};
 use s2n_quic::{Connection, Server as QuicServer};
-use tokio::io::AsyncWriteExt;
+use tokio::io::AsyncReadExt;
 use tokio::sync::mpsc::{self, Sender};
+use tokio::sync::RwLock;
 
 use crate::{action::Action, error::*};
 
@@ -25,7 +27,11 @@ const SOCKET_ADDR: &str = "0.0.0.0:4433";
 static CERT: &str = include_str!("../../certs/cert.pem");
 static KEY: &str = include_str!("../../certs/key.pem");
 
-pub type RoutingInfo = (ReceiveStream, SendStream);
+pub struct RoutingInfo {
+    ip: Ipv4Addr,
+    recv: ReceiveStream,
+    send: SendStream,
+}
 
 pub struct Server {
     db: Db,
@@ -94,20 +100,30 @@ async fn handle_connection(mut connection: Connection, db: Db, tx: Sender<Routin
     info!("connection ended");
 }
 
+#[instrument(skip(recv))]
+async fn parsepkt(mut recv: ReceiveStream) {
+    let mut buf = vec![0; 4096];
+    while let Ok(amount) = recv.read_buf(&mut buf).await {
+        if amount >= 20 {
+            match etherparse::Ipv4Slice::from_slice(&buf[..amount]) {
+                Ok(pktslice) => debug!(?pktslice),
+                Err(error) => error!(?error),
+            };
+        } else {
+            trace!("pkt not large enough");
+        }
+    }
+}
+
 #[instrument(skip(rx))]
 async fn handle_routing(mut rx: mpsc::Receiver<RoutingInfo>) {
-    let mut route_table = HashMap::new();
+    let route_table = RwLock::new(HashMap::new());
 
-    while let Some((recv, mut send)) = rx.recv().await {
-        info!(?recv, ?send, "got routing info");
-        let res = send
-            .write_all(b"HELLO, I AM THE ROUTING TASK AND I NEED HELP. I AM BLINKI TWICE")
-            .await;
+    while let Some(RoutingInfo { ip, send, recv }) = rx.recv().await {
+        let mut route_table = route_table.write().await;
+        route_table.insert(ip, send);
+        drop(route_table);
 
-        if let Err(error) = res {
-            error!(?error, "{error}");
-        }
-
-        route_table.insert("TODO", (recv, send));
+        tokio::spawn(parsepkt(recv));
     }
 }
