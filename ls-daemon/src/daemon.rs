@@ -2,13 +2,12 @@ use std::net::Ipv4Addr;
 
 use tokio::sync::mpsc;
 
+use crate::SERVER_ADDR;
 use errors::*;
 use relay_server::client::*;
 
 #[cfg(target_os = "linux")]
 pub(super) use dbus::*;
-
-pub const SERVER_ADDR: &str = "127.0.0.1:4433";
 
 #[derive(Debug)]
 pub enum DaemonEvent {

@@ -23,6 +23,8 @@ use crate::{
     tun::TunController,
 };
 
+pub const SERVER_ADDR: &str = "0.0.0.0:4433";
+
 #[tokio::main]
 async fn main() -> error::Result {
     tracing_subscriber::fmt::init();
@@ -84,7 +86,7 @@ async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
             Some(TunEvent::SetRemote(Some(value))) => {
                 let (v_recv, v_send) = value.split();
                 send = Some(Arc::new(Mutex::new(v_send)));
-                recv = Some(v_recv);
+                recv = Some(Arc::new(Mutex::new(v_recv)));
                 continue;
             }
             Some(TunEvent::SetRemote(None)) => {
@@ -100,12 +102,35 @@ async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
             None => return error!("channel closed"),
         };
 
-        let mut device = ::tun::create_as_async(&config).unwrap();
-        let _ = recv; // TODO: read packets from the stream
+        let device = ::tun::create_as_async(&config).unwrap();
+        let device = Arc::new(Mutex::new(device));
+
+        match recv.clone() {
+            Some(recv) => {
+                let device = device.clone();
+                tokio::spawn(async move {
+                    let mut buf = [0; 4096];
+                    let mut recv = recv.lock().await;
+                    while let Ok(amount) = recv.read(&mut buf).await {
+                        let pkt = &buf[..amount];
+                        let mut device = device.lock().await;
+                        if let Err(error) = device.write_all(pkt).await {
+                            error!(?error, "error when writing to tun device: {error}");
+                        }
+                    }
+
+                    info!("recv task is being shut down");
+                });
+            }
+            _ => warn!("could not establish a recv stream"),
+        }
 
         let mut buf = [0; 4096];
+        let device = device.clone();
         loop {
+            let mut device = device.lock().await;
             let amount = device.read(&mut buf).await.unwrap();
+            drop(device);
 
             if let Some(send) = send.clone() {
                 let mut send = send.lock().await;
@@ -124,17 +149,7 @@ async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
             }
 
             match rx.try_recv() {
-                Ok(TunEvent::SetRemote(Some(value))) => {
-                    let (v_recv, v_send) = value.split();
-                    send = Some(Arc::new(Mutex::new(v_send)));
-                    recv = Some(v_recv);
-                    continue;
-                }
-                Ok(TunEvent::SetRemote(None)) => {
-                    send = None;
-                    recv = None;
-                    continue;
-                }
+                Ok(TunEvent::SetRemote(_)) => warn!("cannot set remote while TUN is up"),
                 Ok(TunEvent::Down) => break,
                 Ok(TunEvent::Up(_)) => warn!("TUN interface is already up"),
                 Err(TryRecvError::Empty) => (), // happy case

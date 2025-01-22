@@ -1,4 +1,5 @@
 #![feature(let_chains)]
+#![feature(ip_from)]
 
 #[macro_use]
 extern crate tracing;
@@ -8,19 +9,19 @@ mod action;
 pub mod client;
 mod db;
 pub mod error;
+mod packet;
 mod wire;
 
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
+use std::sync::Arc;
 
-use db::Db;
 use s2n_quic::stream::{ReceiveStream, SendStream};
 use s2n_quic::{Connection, Server as QuicServer};
-use tokio::io::AsyncReadExt;
 use tokio::sync::mpsc::{self, Sender};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
-use crate::{action::Action, error::*};
+use crate::{action::Action, db::Db, error::*};
 
 const SOCKET_ADDR: &str = "0.0.0.0:4433";
 
@@ -100,26 +101,15 @@ async fn handle_connection(mut connection: Connection, db: Db, tx: Sender<Routin
     info!("connection ended");
 }
 
-#[instrument(skip(recv))]
-async fn parsepkt(mut recv: ReceiveStream) {
-    let mut buf = [0; 4096];
-    while let Ok(amount) = recv.read(&mut buf).await {
-        match etherparse::Ipv4Slice::from_slice(&buf[..amount]) {
-            Ok(packet) => debug!(?packet, "ipv4 packet"),
-            Err(error) => error!(?error, "could not parse packet: {error}"),
-        }
-    }
-}
-
 #[instrument(skip(rx))]
 async fn handle_routing(mut rx: mpsc::Receiver<RoutingInfo>) {
-    let route_table = RwLock::new(HashMap::new());
+    let route_table = Arc::new(RwLock::new(HashMap::new()));
 
     while let Some(RoutingInfo { ip, send, recv }) = rx.recv().await {
-        let mut route_table = route_table.write().await;
-        route_table.insert(ip, send);
-        drop(route_table);
+        let mut table_w = route_table.write().await;
+        table_w.insert(ip, Mutex::new(send));
+        drop(table_w);
 
-        tokio::spawn(parsepkt(recv));
+        tokio::spawn(packet::parsepkt(recv, route_table.clone()));
     }
 }
