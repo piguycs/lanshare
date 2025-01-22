@@ -109,6 +109,7 @@ async fn handle_routing(mut rx: mpsc::Receiver<RoutingInfo>) {
         let mut table_w = route_table.write().await;
         table_w.insert(ip, Mutex::new(send));
         drop(table_w);
+        info!(?route_table, "ADDED {ip} to the table");
 
         tokio::spawn(packet::parsepkt(recv, route_table.clone()));
     }
