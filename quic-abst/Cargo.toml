@@ -1,0 +1,31 @@
+[package]
+name = "quic-abst"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+
+s2n-quic = { workspace = true, optional = true }
+quinn = "0.11.6"
+
+rcgen = { version = "0.13.2", optional = true }
+
+tokio = { workspace = true, features = ["macros"] }
+
+bincode = { version = "2.0.0-rc.3" }
+
+[dev-dependencies]
+rstest.workspace = true
+tokio-test = "*"
+
+
+[lints]
+workspace = true
+
+[features]
+default = ["rcgen"]
+rcgen = ["dep:rcgen"]
+s2n = ["dep:s2n-quic"]
