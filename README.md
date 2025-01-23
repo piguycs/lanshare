@@ -1,5 +1,9 @@
 # LAN-Share VPN
 
+**CLEANUP BRANCH**:
+this branch is for basic cleanup, and more experimentation with other quic
+implimentations
+
 This is a simple VPN for playing LAN games with your peers across the internet.
 
 The core vpn does work, but I have some serious performance issues to fix.

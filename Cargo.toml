@@ -1,5 +1,9 @@
 [workspace]
-members = ["ls-daemon", "ls-client", "relay-server", "errors"]
+members = [
+    # old stuff
+    #"archive/ls-daemon", "archive/ls-client", "archive/relay-server", "archive/errors",
+    "quic-abst"
+]
 resolver = "2"
 
 [workspace.package]
@@ -29,7 +33,7 @@ trait-variant = { version = "0.1.2" }
 etherparse = { version = "0.17.0" }
 
 #sqlite = { version = "0.36.1" }
-rusqlite = { version = "0.32.1", features = ["bundled"] }
+rusqlite = { version = "0.33.0", features = ["bundled"] }
 
 # [target.'cfg(target_os = "linux")'.dependencies]
 tun = { version = "0.7.10", features = ["async"] }
@@ -39,5 +43,8 @@ zbus = { version = "5.2.0", features = ["tokio"] }
 rstest = { version = "0.24.0" }
 
 # packages in THIS workspace
-errors = { path = "errors" }
-relay-server = { path = "relay-server" }
+# errors = { path = "archive/errors" }
+# relay-server = { path = "archive/relay-server" }
+
+# quic abstraction (library agnostic api)
+quic-abst = { path = "quic-abst" }

@@ -25,8 +25,8 @@ use crate::{action::Action, db::Db, error::*};
 
 const SOCKET_ADDR: &str = "0.0.0.0:4433";
 
-static CERT: &str = include_str!("../../certs/cert.pem");
-static KEY: &str = include_str!("../../certs/key.pem");
+static CERT: &str = include_str!("../../../certs/cert.pem");
+static KEY: &str = include_str!("../../../certs/key.pem");
 
 pub struct RoutingInfo {
     ip: Ipv4Addr,
