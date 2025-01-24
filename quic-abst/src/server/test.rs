@@ -24,11 +24,16 @@ async fn server_handler_wrapper<T>(
     let input = bincode::encode_to_vec(input, BC_CFG).unwrap();
     let mut reader = tokio_test::io::Builder::new().read(&input).build();
 
-    let res = server.wrap_handle(&mut reader).await;
+    let mut writer = vec![];
+    let res = server.wrap_handle(&mut reader, &mut writer).await;
 
     match (res, output) {
         (Err(Error::DecodeError(_)), None) => (),
-        (Ok(res), Some(output)) => assert_eq!(res, output),
+        (Ok(_), Some(output)) => {
+            let (res, _): (Result<(), ()>, usize) =
+                bincode::decode_from_slice(&writer, BC_CFG).unwrap();
+            assert_eq!(res, output);
+        }
         other => panic!("{other:?}"),
     }
 }

@@ -33,14 +33,18 @@ where
             Ok(pending_conn) => {
                 if let Ok(conn) = pending_conn.await {
                     // part 1
-                    let mut send = conn.open_uni().await.unwrap();
                     let data = bincode::encode_to_vec(&input, BC_CFG).unwrap();
+
+                    let mut send = conn.open_uni().await.unwrap();
                     send.write_all(&data).await.unwrap();
+                    send.shutdown().await.unwrap();
+                    drop(send);
 
                     // part 2
-                    let mut recv = conn.accept_uni().await.unwrap();
                     let mut buf = [0; 1500];
+                    let mut recv = conn.accept_uni().await.unwrap();
                     let amount = recv.read(&mut buf).await.unwrap().unwrap();
+                    drop(recv);
 
                     let data = &buf[..amount];
 

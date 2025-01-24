@@ -25,7 +25,7 @@ impl Handler for TestHandler {
 }
 
 #[tokio::test]
-async fn a() {
+async fn client_server_simple() {
     let local_addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 5000);
 
     let handler = TestHandler;
@@ -34,7 +34,7 @@ async fn a() {
     let client = handler.get_client_local(local_addr, cert);
 
     tokio::select! {
-        _ = server.listen() => (),
+        _ = server.listen() => panic!("the server must not be the first to close"),
         _ = async {
             let r1 = client.send(TestInput::Good).await;
             let r2 = client.send(TestInput::Bad).await;

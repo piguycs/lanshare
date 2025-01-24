@@ -7,7 +7,7 @@
 //! accessing the inner values of the server struct.
 //!
 //! # Example
-//! ```rust
+//! ```rust ignore
 //! let socket_addr = SocketAddr::from_str("127.0.0.1:5000")?;
 //! let (server, cert_der) = Server::try_new_local(socket_addr, MockHandler)?;
 //! ```
@@ -19,7 +19,7 @@ use std::net::SocketAddr;
 
 use quinn::{rustls, ServerConfig};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::{error::*, handler::Handler, BC_CFG};
 
@@ -33,30 +33,38 @@ impl<H: Handler> Server<H> {
     pub async fn listen(&self) {
         while let Some(incoming) = self.endpoint.accept().await {
             if let Ok(conn) = incoming.await {
-                // part 1
-                let mut recv = conn.accept_uni().await.unwrap();
-                let data = self.wrap_handle(&mut recv).await.unwrap();
+                let mut writer = vec![];
 
-                // part 2
-                let data = bincode::encode_to_vec(data, BC_CFG).unwrap();
+                {
+                    let mut recv = conn.accept_uni().await.unwrap();
+                    self.wrap_handle(&mut recv, &mut writer).await.unwrap()
+                };
+
                 let mut send = conn.open_uni().await.unwrap();
-                send.write_all(&data).await.unwrap();
+                send.write_all(&writer).await.unwrap();
+
+                send.shutdown().await.unwrap();
+                send.stopped().await.unwrap();
             }
         }
     }
 
-    async fn wrap_handle<R>(&self, recv: &mut R) -> Result<H::Out>
+    async fn wrap_handle<R, W>(&self, reader: &mut R, writer: &mut W) -> Result<()>
     where
         R: AsyncRead + Unpin,
+        W: AsyncWrite + Unpin,
     {
         let mut buf = [0; 1000];
-        if let Ok(amount) = recv.read(&mut buf).await
+        if let Ok(amount) = reader.read(&mut buf).await
             && amount > 0
         {
             let (decoded, _len) = bincode::decode_from_slice(&buf[..amount], BC_CFG)?;
             let out = self.handler.handle(decoded);
 
-            Ok(out)
+            let amount = bincode::encode_into_slice(out, &mut buf, BC_CFG)?;
+            writer.write_all(&buf[..amount]).await?;
+
+            Ok(())
         } else {
             Err(Error::StreamEnd)
         }
