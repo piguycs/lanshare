@@ -33,23 +33,33 @@ impl<H: Handler> Server<H> {
     pub async fn listen(&self) {
         while let Some(incoming) = self.endpoint.accept().await {
             if let Ok(conn) = incoming.await {
-                let mut writer = vec![];
+                let res = self.recv_send_conn(conn).await;
 
-                {
-                    let mut recv = conn.accept_uni().await.unwrap();
-                    self.wrap_handle(&mut recv, &mut writer).await.unwrap()
-                };
-
-                let mut send = conn.open_uni().await.unwrap();
-                send.write_all(&writer).await.unwrap();
-
-                send.shutdown().await.unwrap();
-                send.stopped().await.unwrap();
+                if let Err(error) = res {
+                    eprintln!("{error:?} [ERROR] {error}");
+                }
             }
         }
     }
 
-    async fn wrap_handle<R, W>(&self, reader: &mut R, writer: &mut W) -> Result<()>
+    async fn recv_send_conn(&self, conn: quinn::Connection) -> Result {
+        let mut writer = vec![];
+
+        {
+            let mut recv = conn.accept_uni().await?;
+            self.wrap_handle(&mut recv, &mut writer).await?
+        };
+
+        let mut send = conn.open_uni().await?;
+        send.write_all(&writer).await?;
+
+        send.shutdown().await?;
+        send.stopped().await?;
+
+        Ok(())
+    }
+
+    async fn wrap_handle<R, W>(&self, reader: &mut R, writer: &mut W) -> Result
     where
         R: AsyncRead + Unpin,
         W: AsyncWrite + Unpin,

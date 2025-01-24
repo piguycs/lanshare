@@ -15,6 +15,14 @@ pub enum Error {
     #[error("stream ended")]
     StreamEnd,
 
+    // quic & quinn heavy errors
+    #[error(transparent)]
+    QuinnError(#[from] quinn::ConnectionError),
+    #[error(transparent)]
+    QuicWriteError(#[from] quinn::WriteError),
+    #[error(transparent)]
+    QuicStreamStopError(#[from] quinn::StoppedError),
+
     #[cfg(feature = "rcgen")]
     #[error(transparent)]
     CertGenError(#[from] rcgen::Error),
