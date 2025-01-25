@@ -4,13 +4,8 @@ use std::{
 };
 
 use bincode::{Decode, Encode};
-use quinn::{
-    rustls::{
-        pki_types::{CertificateDer, PrivateKeyDer},
-        RootCertStore,
-    },
-    ClientConfig, Endpoint,
-};
+pub use quinn::rustls::pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
+use quinn::{rustls::RootCertStore, ClientConfig, Endpoint};
 
 use crate::{client::Client, server::Server};
 

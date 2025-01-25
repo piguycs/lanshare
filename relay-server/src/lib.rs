@@ -6,6 +6,7 @@ pub struct VpnHandler {}
 #[derive(Debug, Encode, Decode)]
 pub enum HandlerInput {
     Login { username: String, password: String },
+    Activate { token: String },
 }
 
 impl Handler for VpnHandler {
@@ -15,6 +16,7 @@ impl Handler for VpnHandler {
     fn handle(&self, input: Self::In) -> Self::Out {
         match input {
             HandlerInput::Login { .. } => Ok(()),
+            HandlerInput::Activate { .. } => Ok(()),
         }
     }
 }
