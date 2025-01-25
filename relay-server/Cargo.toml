@@ -1,0 +1,15 @@
+[package]
+name = "relay-server"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+tokio.workspace = true
+bincode = { version = "2.0.0-rc.3" }
+
+quic-abst.workspace = true
+
+[lints]
+workspace = true

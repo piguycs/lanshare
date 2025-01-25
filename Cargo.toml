@@ -1,9 +1,9 @@
 [workspace]
-members = [
+members = [ "ls-daemon",
     # old stuff
     #"archive/ls-daemon", "archive/ls-client", "archive/relay-server", "archive/errors",
     "quic-abst"
-]
+, "relay-server"]
 resolver = "2"
 
 [workspace.package]
@@ -44,7 +44,5 @@ rstest = { version = "0.24.0" }
 
 # packages in THIS workspace
 # errors = { path = "archive/errors" }
-# relay-server = { path = "archive/relay-server" }
-
-# quic abstraction (library agnostic api)
+relay-server = { path = "relay-server" }
 quic-abst = { path = "quic-abst" }

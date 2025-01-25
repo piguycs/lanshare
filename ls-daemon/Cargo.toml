@@ -1,0 +1,19 @@
+[package]
+name = "ls-daemon"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+tokio.workspace = true
+tun.workspace = true
+thiserror.workspace = true
+
+quic-abst = { workspace = true, features = [] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus.workspace = true
+
+[lints]
+workspace = true

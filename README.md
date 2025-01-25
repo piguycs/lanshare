@@ -43,3 +43,14 @@ C++ as long as there are any real advantages over C# for this. Again, core would
 be my rust daemon exported as a dynamic library. I think WinUI3 is the most
 modern toolkit for windows? idk... my university forced me to use winforms and
 called it a semester.
+
+## Other technical stuff
+
+I have tried to use channels as much as possible. These seem to be decently
+fast on linux, but they also mean that I can easily cause deadlocks. Especially
+due to the tun device constantly reading in a loop (my guess). I will be
+cleaning up a lot of this code in the `cleanup` branch.
+
+I am also going to try to use some principles from rocket-rs, where my types
+should not be Clone/Copy by default. I might turn back on this "philosophy" if
+it gets too difficult. I want to enjoy writing this at the end of the day.

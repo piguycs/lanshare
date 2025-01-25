@@ -29,7 +29,6 @@ pub struct Server<H: Handler> {
 }
 
 impl<H: Handler> Server<H> {
-    // NOTE: this needs end-to end testing not unit testing
     pub async fn listen(&self) {
         while let Some(incoming) = self.endpoint.accept().await {
             if let Ok(conn) = incoming.await {
