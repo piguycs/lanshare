@@ -72,22 +72,34 @@ async fn main() -> error::Result {
 
 #[instrument(skip(rx))]
 async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
+    let mut stream = None;
+    let mut device = None;
+
     loop {
         match rx.try_recv() {
-            // gets a bi-directional stream. basically, calling .split() on it would return a
-            // (reader, writer), and you have to read things from the reader and replay them
-            // locally on the tun while any outgoing messages from the tun will be written.
-            // simply speaking, reads from tun are written to tun, reads from stream are written to tun
-            Ok(TunEvent::SetRemote(Some(_))) => todo!(),
+            Ok(TunEvent::SetRemote(Some(bi))) => stream = Some(bi),
             // gets tun::Configuration, needs to create a device and keep reading in a loop
-            Ok(TunEvent::Up(_)) => todo!(),
-            // device needs to be dropped
-            Ok(TunEvent::Down) => todo!(),
+            Ok(TunEvent::Up(config)) => {
+                device = Some(::tun::create_as_async(&config).unwrap());
+            }
+
+            // this means we keep doing what we were doing
+            Err(TryRecvError::Empty) if stream.is_some() || device.is_some() => (),
             // no event in queue, we add a little ratelimit here
             Err(TryRecvError::Empty) => tokio::time::sleep(std::time::Duration::from_secs(5)).await,
-            // todos
-            Ok(TunEvent::SetRemote(None)) => todo!("unsetting remote is not supported"),
+
+            // states when the loop must go down
+            Ok(TunEvent::Down) => device = None,
+            Ok(TunEvent::SetRemote(None)) => stream = None,
+
             Err(error) => todo!("{error:?}"),
+        };
+
+        if let (Some(device), Some(stream)) = (&mut device, &mut stream) {
+            trace!("STARTING COPY");
+            tokio::io::copy(device, stream).await.unwrap();
+            tokio::io::copy(stream, device).await.unwrap();
+            trace!("ENDING COPY");
         }
     }
 }
