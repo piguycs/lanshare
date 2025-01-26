@@ -39,3 +39,11 @@ C++ as long as there are any real advantages over C# for this. Again, core would
 be my rust daemon exported as a dynamic library. I think WinUI3 is the most
 modern toolkit for windows? idk... my university forced me to use winforms and
 called it a semester.
+
+## Current state of the project
+
+It "works" as of commit `6d8fa7fc7534d7d699fb7da309d61010963e4957`. I suspect
+something is wrong with the device_task, which I am attempting to rewrite. Any
+help would be appreciated, honestly I am at the end of my wits here. There might
+be some sort of a deadlock going on, but it frees up occasionally letting very
+few packets through. This is an absolute tragedy, but I learnt a lot!
