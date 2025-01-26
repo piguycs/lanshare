@@ -8,10 +8,7 @@ mod daemon;
 mod error;
 mod tun;
 
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    sync::mpsc::{self, error::TryRecvError},
-};
+use tokio::sync::mpsc::{self, error::TryRecvError};
 use tun::TunEvent;
 use zbus::connection;
 
@@ -74,7 +71,7 @@ async fn main() -> error::Result {
 }
 
 #[instrument(skip(rx))]
-async fn device_task_old(mut rx: mpsc::Receiver<TunEvent>) {
+async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
     loop {
         match rx.try_recv() {
             // gets a bi-directional stream. basically, calling .split() on it would return a
@@ -91,79 +88,6 @@ async fn device_task_old(mut rx: mpsc::Receiver<TunEvent>) {
             // todos
             Ok(TunEvent::SetRemote(None)) => todo!("unsetting remote is not supported"),
             Err(error) => todo!("{error:?}"),
-        }
-    }
-}
-#[instrument(skip(rx))]
-async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
-    let mut tun_device = None; // Placeholder for the TUN device
-    let mut remote_stream = None; // Placeholder for the bi-directional stream
-
-    loop {
-        match rx.try_recv() {
-            Ok(TunEvent::SetRemote(Some(stream))) => {
-                // Set the remote stream
-                remote_stream = Some(stream);
-                info!("Remote stream set");
-            }
-            Ok(TunEvent::Up(config)) => {
-                // Create and configure the TUN device
-                tun_device = Some(::tun::create_as_async(&config).unwrap());
-                info!("TUN device is up");
-            }
-            Ok(TunEvent::Down) => {
-                // Clean up and close the TUN device
-                if let Some(mut device) = tun_device.take() {
-                    info!("TUN device starting to shutdown");
-                    device.shutdown().await.unwrap();
-                    tun_device = None;
-                    info!("TUN device is down");
-                }
-            }
-            Ok(TunEvent::SetRemote(None)) => {
-                // Handle unsetting the remote stream
-                remote_stream = None;
-                info!("Remote stream unset");
-            }
-            Err(TryRecvError::Empty) => {
-                // No event in queue, rate limit
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            }
-            Err(error) => {
-                error!("Error receiving event: {:?}", error);
-            }
-        }
-
-        // If we have a remote stream and a TUN device, handle data transfer
-        if let (Some(stream), Some(device)) = (remote_stream.as_mut(), tun_device.as_mut()) {
-            let mut read_buf = vec![0; 1500];
-            let mut write_buf = vec![0; 1500];
-
-            tokio::select! {
-                // Handle stream -> device
-                stream_result = stream.read(&mut read_buf) => {
-                    match stream_result {
-                        Ok(0) => {
-                            info!("Remote stream closed");
-                            remote_stream = None;
-                        }
-                        Ok(n) => {
-                            info!("WRITEEEE");
-                            device.write_all(&read_buf[..n]).await.unwrap();
-                        }
-                        Err(e) => {
-                            error!("Error reading from remote stream: {:?}", e);
-                        }
-                    }
-                }
-                // Handle device -> stream
-                device_result = device.read(&mut write_buf) => {
-                    if let Ok(n) = device_result && n > 0 {
-                        info!("READDDDD");
-                        stream.write_all(&write_buf[..n]).await.unwrap();
-                    }
-                }
-            }
         }
     }
 }
