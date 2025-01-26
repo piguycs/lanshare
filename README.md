@@ -6,7 +6,8 @@ The core vpn does work, but I have some serious performance issues to fix.
 
 Right now, this vpn only "works" on Linux. It can technically be made to work
 on MacOS and Windows too, but it wont use the platform native tools for those
-platforms. This can potentially lead to a sub-par experience.
+platforms and needs third party libraries during runtime. Checkout docs for
+github.com/meh/rust-tun
 
 ## Technical info (Linux)
 
