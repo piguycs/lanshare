@@ -17,7 +17,7 @@ impl Handler for MockHandler {
     type In = MockData;
     type Out = Result<(), ()>;
 
-    fn handle(&self, input: Self::In) -> Self::Out {
+    async fn handle(&self, input: Self::In) -> Self::Out {
         match input {
             MockData::Good => Ok(()),
             MockData::Bad => Err(()),

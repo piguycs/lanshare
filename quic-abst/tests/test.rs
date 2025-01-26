@@ -16,7 +16,7 @@ impl Handler for TestHandler {
     type In = TestInput;
     type Out = Result<(), ()>;
 
-    fn handle(&self, input: Self::In) -> Self::Out {
+    async fn handle(&self, input: Self::In) -> Self::Out {
         match input {
             TestInput::Good => Ok(()),
             TestInput::Bad => Err(()),

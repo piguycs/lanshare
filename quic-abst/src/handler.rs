@@ -4,8 +4,8 @@ use std::{
 };
 
 use bincode::{Decode, Encode};
-pub use quinn::rustls::pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer};
-use quinn::{rustls::RootCertStore, ClientConfig, Endpoint};
+pub use quinn::rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
+use quinn::{ClientConfig, Endpoint, rustls::RootCertStore};
 
 use crate::{client::Client, server::Server};
 
@@ -13,7 +13,7 @@ pub trait Handler {
     type In: Decode + Encode;
     type Out: Decode + Encode;
 
-    fn handle(&self, input: Self::In) -> Self::Out;
+    fn handle(&self, input: Self::In) -> impl Future<Output = Self::Out> + Sized;
 
     fn get_server<C, P>(self, addr: SocketAddr, cert_der: C, priv_key: P) -> Server<Self>
     where

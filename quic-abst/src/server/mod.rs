@@ -17,11 +17,11 @@ mod test;
 
 use std::net::SocketAddr;
 
-use quinn::{rustls, ServerConfig};
+use quinn::{ServerConfig, rustls};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-use crate::{error::*, handler::Handler, BC_CFG};
+use crate::{BC_CFG, error::*, handler::Handler};
 
 pub struct Server<H: Handler> {
     pub endpoint: quinn::Endpoint,
@@ -68,7 +68,7 @@ impl<H: Handler> Server<H> {
             && amount > 0
         {
             let (decoded, _len) = bincode::decode_from_slice(&buf[..amount], BC_CFG)?;
-            let out = self.handler.handle(decoded);
+            let out = self.handler.handle(decoded).await;
 
             let amount = bincode::encode_into_slice(out, &mut buf, BC_CFG)?;
             writer.write_all(&buf[..amount]).await?;

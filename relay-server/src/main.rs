@@ -10,7 +10,7 @@ async fn main() {
     let cert = CertificateDer::from_pem_file("certs/cert.pem").unwrap();
     let key = PrivateKeyDer::from_pem_file("certs/key.pem").unwrap();
 
-    let server = VpnHandler {}.get_server(addr, cert, key);
+    let server = VpnHandler::new().get_server(addr, cert, key);
 
     server.listen().await;
 }
