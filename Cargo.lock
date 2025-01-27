@@ -853,6 +853,7 @@ name = "ls-daemon"
 version = "0.1.0-dev"
 dependencies = [
  "errors",
+ "futures",
  "relay-server",
  "serde",
  "thiserror",

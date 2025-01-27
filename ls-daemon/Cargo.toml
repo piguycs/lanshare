@@ -16,6 +16,7 @@ thiserror.workspace = true
 
 relay-server.workspace = true
 errors.workspace = true
+futures = "0.3.31"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 tun.workspace = true

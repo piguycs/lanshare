@@ -8,8 +8,12 @@ mod daemon;
 mod error;
 mod tun;
 
-use std::sync::Arc;
+use std::{
+    io::{Read, Write},
+    sync::Arc,
+};
 
+use futures::StreamExt;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::{
@@ -104,20 +108,16 @@ async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
             None => return error!("channel closed"),
         };
 
-        let (device_write, device_read) = ::tun::create_as_async(&config).unwrap().split().unwrap();
-        let device_write = Arc::new(Mutex::new(device_write));
-        let device_read = Arc::new(Mutex::new(device_read));
+        let (mut device_read, mut device_write) = ::tun::create(&config).unwrap().split();
 
         match recv.clone() {
             Some(recv) => {
-                let device = device_write.clone();
                 tokio::spawn(async move {
                     let mut buf = [0; 4096];
                     let mut recv = recv.lock().await;
                     while let Ok(amount) = recv.read(&mut buf).await {
                         let pkt = &buf[..amount];
-                        let mut device = device.lock().await;
-                        if let Err(error) = device.write_all(pkt).await {
+                        if let Err(error) = device_write.write_all(pkt) {
                             error!(?error, "error when writing to tun device: {error}");
                         }
                     }
@@ -129,11 +129,8 @@ async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
         }
 
         let mut buf = [0; 4096];
-        let device = device_read.clone();
         loop {
-            let mut device = device.lock().await;
-            let amount = device.read(&mut buf).await.unwrap();
-            drop(device);
+            let amount = device_read.read(&mut buf).unwrap();
 
             if let Some(send) = send.clone() {
                 let mut send = send.lock().await;
@@ -160,4 +157,16 @@ async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
             }
         }
     }
+}
+
+// sudo -E cargo test
+#[tokio::test]
+async fn hello() {
+    let mut config = ::tun::Configuration::default();
+    config.platform_config(|config| {
+        config.ensure_root_privileges(false);
+    });
+
+    let device = ::tun::create_as_async(&config).unwrap();
+    let (_, _) = device.into_framed().split();
 }
