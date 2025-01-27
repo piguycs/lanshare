@@ -8,7 +8,15 @@ mod daemon;
 mod error;
 mod tun;
 
-use tokio::sync::mpsc::{self, error::TryRecvError};
+use std::sync::Arc;
+
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    sync::{
+        mpsc::{self, error::TryRecvError},
+        Mutex,
+    },
+};
 use tun::TunEvent;
 use zbus::connection;
 
@@ -72,35 +80,84 @@ async fn main() -> error::Result {
 
 #[instrument(skip(rx))]
 async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
-    let mut stream = None;
-    let mut device = None;
+    let mut send = None;
+    let mut recv = None;
 
     loop {
-        match rx.try_recv() {
-            Ok(TunEvent::SetRemote(Some(bi))) => stream = Some(bi.split()),
-            // gets tun::Configuration, needs to create a device and keep reading in a loop
-            Ok(TunEvent::Up(config)) => {
-                device = Some(::tun::create_as_async(&config).unwrap().split().unwrap());
+        let config = match rx.recv().await {
+            Some(TunEvent::SetRemote(Some(value))) => {
+                let (v_recv, v_send) = value.split();
+                send = Some(Arc::new(Mutex::new(v_send)));
+                recv = Some(Arc::new(Mutex::new(v_recv)));
+                continue;
             }
-
-            // this means we keep doing what we were doing
-            Err(TryRecvError::Empty) if stream.is_some() || device.is_some() => (),
-            // no event in queue, we add a little ratelimit here
-            Err(TryRecvError::Empty) => tokio::time::sleep(std::time::Duration::from_secs(5)).await,
-
-            // states when the loop must go down
-            Ok(TunEvent::Down) => device = None,
-            Ok(TunEvent::SetRemote(None)) => stream = None,
-
-            Err(error) => todo!("{error:?}"),
+            Some(TunEvent::SetRemote(None)) => {
+                send = None;
+                recv = None;
+                continue;
+            }
+            Some(TunEvent::Up(config)) => config,
+            Some(TunEvent::Down) => {
+                warn!("TUN interface is already down");
+                continue;
+            }
+            None => return error!("channel closed"),
         };
 
-        if let (Some((device_w, device_r)), Some((stream_r, stream_w))) = (&mut device, &mut stream)
-        {
-            tokio::select! {
-                _ = tokio::io::copy(device_r, stream_w) => (),
-                _ = tokio::io::copy(stream_r, device_w) => (),
-            };
+        let (device_write, device_read) = ::tun::create_as_async(&config).unwrap().split().unwrap();
+        let device_write = Arc::new(Mutex::new(device_write));
+        let device_read = Arc::new(Mutex::new(device_read));
+
+        match recv.clone() {
+            Some(recv) => {
+                let device = device_write.clone();
+                tokio::spawn(async move {
+                    let mut buf = [0; 4096];
+                    let mut recv = recv.lock().await;
+                    while let Ok(amount) = recv.read(&mut buf).await {
+                        let pkt = &buf[..amount];
+                        let mut device = device.lock().await;
+                        if let Err(error) = device.write_all(pkt).await {
+                            error!(?error, "error when writing to tun device: {error}");
+                        }
+                    }
+
+                    info!("recv task is being shut down");
+                });
+            }
+            _ => warn!("could not establish a recv stream"),
+        }
+
+        let mut buf = [0; 4096];
+        let device = device_read.clone();
+        loop {
+            let mut device = device.lock().await;
+            let amount = device.read(&mut buf).await.unwrap();
+            drop(device);
+
+            if let Some(send) = send.clone() {
+                let mut send = send.lock().await;
+                let mut pkt = &buf[..amount];
+
+                debug!(?pkt, "maybe sending packet");
+                match send.write_buf(&mut pkt).await {
+                    Ok(sent_amount) if sent_amount != amount => {
+                        warn!(?sent_amount, ?amount, "packet of incorrect len sent")
+                    }
+                    Err(error) => {
+                        error!(?error, "{error}");
+                    }
+                    Ok(_) => (),
+                }
+            }
+
+            match rx.try_recv() {
+                Ok(TunEvent::SetRemote(_)) => warn!("cannot set remote while TUN is up"),
+                Ok(TunEvent::Down) => break,
+                Ok(TunEvent::Up(_)) => warn!("TUN interface is already up"),
+                Err(TryRecvError::Empty) => (), // happy case
+                Err(error) => error!(?error, "(probably) nonfatal error: {error}"),
+            }
         }
     }
 }
