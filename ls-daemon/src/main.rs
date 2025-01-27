@@ -77,10 +77,10 @@ async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
 
     loop {
         match rx.try_recv() {
-            Ok(TunEvent::SetRemote(Some(bi))) => stream = Some(bi),
+            Ok(TunEvent::SetRemote(Some(bi))) => stream = Some(bi.split()),
             // gets tun::Configuration, needs to create a device and keep reading in a loop
             Ok(TunEvent::Up(config)) => {
-                device = Some(::tun::create_as_async(&config).unwrap());
+                device = Some(::tun::create_as_async(&config).unwrap().split().unwrap());
             }
 
             // this means we keep doing what we were doing
@@ -95,11 +95,12 @@ async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
             Err(error) => todo!("{error:?}"),
         };
 
-        if let (Some(device), Some(stream)) = (&mut device, &mut stream) {
-            trace!("STARTING COPY");
-            tokio::io::copy(device, stream).await.unwrap();
-            tokio::io::copy(stream, device).await.unwrap();
-            trace!("ENDING COPY");
+        if let (Some((device_w, device_r)), Some((stream_r, stream_w))) = (&mut device, &mut stream)
+        {
+            tokio::select! {
+                _ = tokio::io::copy(device_r, stream_w) => (),
+                _ = tokio::io::copy(stream_r, device_w) => (),
+            };
         }
     }
 }
