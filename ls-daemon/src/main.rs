@@ -13,7 +13,6 @@ use std::{
     sync::Arc,
 };
 
-use futures::StreamExt;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::{
@@ -157,16 +156,4 @@ async fn device_task(mut rx: mpsc::Receiver<TunEvent>) {
             }
         }
     }
-}
-
-// sudo -E cargo test
-#[tokio::test]
-async fn hello() {
-    let mut config = ::tun::Configuration::default();
-    config.platform_config(|config| {
-        config.ensure_root_privileges(false);
-    });
-
-    let device = ::tun::create_as_async(&config).unwrap();
-    let (_, _) = device.into_framed().split();
 }

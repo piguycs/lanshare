@@ -2,12 +2,13 @@
 
 This is a simple VPN for playing LAN games with your peers across the internet.
 
-The core vpn does work, but I have some serious performance issues to fix.
+The vpn does work, but I have some serious performance issues to fix.
+(~15-30ms delay with the current MVP, goal is to be sub 0.5ms)
 
 Right now, this vpn only "works" on Linux. It can technically be made to work
 on MacOS and Windows too, but it wont use the platform native tools for those
 platforms and needs third party libraries during runtime. Checkout docs for
-github.com/meh/rust-tun
+github.com/meh/rust-tun. I do plan on fully supporting other operating systems.
 
 ## Technical info (Linux)
 
@@ -43,8 +44,29 @@ called it a semester.
 
 ## Current state of the project
 
-It "works" as of commit `6d8fa7fc7534d7d699fb7da309d61010963e4957`. I suspect
-something is wrong with the device_task, which I am attempting to rewrite. Any
-help would be appreciated, honestly I am at the end of my wits here. There might
-be some sort of a deadlock going on, but it frees up occasionally letting very
-few packets through. This is an absolute tragedy, but I learnt a lot!
+The vpn works, and can be used on linux machines. The procedure for testing it
+is very manual for now, but I am working on an automatic testing suite based on
+top of testcontainers, but manual testing is required for now. My main focus
+when writing the code for this was to learn and to figure things out. Now that
+I have done that, I will be making this more "production ready".
+
+Here is the (currently manual) process:
+run `just run-server` on a designated server node.
+**edit `ls-daemon/src/main.rs` to point to the IP of this server.**
+
+Run `just run-daemon-root` in 2 different client nodes. One of these can host
+the server too.
+
+Now we need to setup a dbus policy, OR you can try running ls-client as root.
+Move ./config/dbus/me.piguy.lanshare.conf to the appropriate location on your
+system. For me, it is `/usr/share/dbus-1/system.d/me.piguy.lanshare.conf`.
+
+Finally, run `just run-client` on your client nodes. This starts a repl, a gui
+based on iced-rs is being worked on right now. You need to run:
+```
+> name ANY_UNIQUE_NAME_HERE
+> upgrade
+> up
+```
+Now, you should get an IP assigned to your node. You can view it by running
+`ip a`. This can be pinged from any other node on your device.
