@@ -1,5 +1,4 @@
 #![feature(never_type)]
-#![feature(let_chains)]
 
 #[macro_use]
 extern crate tracing;
@@ -16,8 +15,8 @@ use std::{
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::{
-        mpsc::{self, error::TryRecvError},
         Mutex,
+        mpsc::{self, error::TryRecvError},
     },
 };
 use tun::TunEvent;
